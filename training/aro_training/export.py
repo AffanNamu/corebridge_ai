@@ -44,6 +44,7 @@ class ExportResult:
     preferences: list[dict[str, Any]] = field(default_factory=list)
     skipped_unrated: int = 0
     skipped_not_aro: int = 0
+    skipped_other_model: int = 0
 
 
 def _hash(*parts: str) -> str:
@@ -63,7 +64,16 @@ def _context(messages: list[dict[str, Any]], upto: int, system_prompt: str) -> l
     return [{"role": "system", "content": system_prompt}, *history]
 
 
-def build_examples(conversations: Iterable[Conversation], system_prompt: str = CONFIG.system_prompt) -> ExportResult:
+def build_examples(
+    conversations: Iterable[Conversation],
+    system_prompt: str = CONFIG.system_prompt,
+    model_id: str | None = None,
+) -> ExportResult:
+    """`model_id` keeps only answers served by that ARO model (e.g. 'aro-code').
+
+    Messages saved before specialist models existed carry model 'aro-1.5'
+    (or none), so they count as ARO 1.5 data.
+    """
     result = ExportResult()
     for convo in conversations:
         for index, message in enumerate(convo.messages):
@@ -71,6 +81,10 @@ def build_examples(conversations: Iterable[Conversation], system_prompt: str = C
                 continue
             if message.get("servedBy") != "aro":
                 result.skipped_not_aro += 1
+                continue
+            served_model = message.get("model") or "aro-1.5"
+            if model_id and served_model != model_id:
+                result.skipped_other_model += 1
                 continue
 
             rating = int(message.get("rating") or 0)
@@ -80,15 +94,15 @@ def build_examples(conversations: Iterable[Conversation], system_prompt: str = C
             if len(prompt) < 2 or prompt[-1]["role"] != "user":
                 continue
 
-            source = _hash(convo.owner_id, convo.id, str(message.get("id", index)))
+            source = "feedback:" + _hash(convo.owner_id, convo.id, str(message.get("id", index)))
             if rating > 0 and answer:
-                result.sft.append({"messages": [*prompt, {"role": "assistant", "content": answer}], "source": source, "kind": "liked"})
+                result.sft.append({"messages": [*prompt, {"role": "assistant", "content": answer}], "source": source, "kind": "liked", "model": served_model})
             elif rating < 0 and correction:
                 result.sft.append(
-                    {"messages": [*prompt, {"role": "assistant", "content": correction}], "source": source, "kind": "corrected"}
+                    {"messages": [*prompt, {"role": "assistant", "content": correction}], "source": source, "kind": "corrected", "model": served_model}
                 )
                 if answer:
-                    result.preferences.append({"prompt": prompt, "chosen": correction, "rejected": answer, "source": source})
+                    result.preferences.append({"prompt": prompt, "chosen": correction, "rejected": answer, "source": source, "model": served_model})
             else:
                 result.skipped_unrated += 1
     return result

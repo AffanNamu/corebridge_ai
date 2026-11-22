@@ -36,7 +36,7 @@ def test_only_rated_aro_answers_from_consenting_users_are_used():
     answers = [e["messages"][-1]["content"] for e in result.sft]
     assert answers == ["4", "Accra"]
     assert result.preferences == [
-        {"prompt": result.sft[1]["messages"][:-1], "chosen": "Accra", "rejected": "Lagos", "source": result.preferences[0]["source"]}
+        {"prompt": result.sft[1]["messages"][:-1], "chosen": "Accra", "rejected": "Lagos", "source": result.preferences[0]["source"], "model": "aro-1.5"}
     ]
     assert result.skipped_unrated == 1
     assert result.skipped_not_aro == 2

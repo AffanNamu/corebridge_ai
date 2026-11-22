@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Starts / stops the live ARO server (the one the app talks to) in the
-# background, serving the current published version from ARO_HUB_REPO.
+# background, serving every model's current published version (ARO_HUB_NAMESPACE).
 #   ./scripts/live_server.sh start | stop | status
 set -uo pipefail
 cd "$(dirname "$0")/.."

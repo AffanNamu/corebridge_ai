@@ -40,7 +40,8 @@
         "served_name": "aro-1.5",
         "endpoint": "text"
       },
-      "router_keywords": []
+      "router_keywords": [],
+      "system_prompt": "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5. Be accurate, concise and helpful. If you are not sure about something, say so."
     },
     {
       "id": "aro-code",
@@ -105,7 +106,8 @@
         "git",
         "unit test",
         "refactor"
-      ]
+      ],
+      "system_prompt": "You are ARO Code, ARO AI's software engineering model. Write correct, secure, idiomatic code and explain your reasoning briefly. Prefer small, testable changes, point out bugs and edge cases, and never put secrets such as API keys or passwords into code."
     },
     {
       "id": "aro-research",
@@ -159,7 +161,8 @@
         "chemistry",
         "biology",
         "engineering analysis"
-      ]
+      ],
+      "system_prompt": "You are ARO Research, ARO AI's model for science, mathematics and advanced reasoning. Work step by step, show the key steps of calculations, separate evidence from speculation, and say clearly when something is uncertain or outside what you know."
     },
     {
       "id": "aro-vision",
@@ -195,7 +198,8 @@
         "endpoint": "vision",
         "upgrade_path": "Qwen/Qwen3-VL-8B-Instruct (apache-2.0)"
       },
-      "router_keywords": []
+      "router_keywords": [],
+      "system_prompt": "You are ARO Vision, ARO AI's visual intelligence model. Describe and analyse images, documents and screenshots accurately. Only state what you can actually see, and say when something is unclear."
     },
     {
       "id": "aro-voice",
@@ -366,7 +370,8 @@
         "in wolof",
         "in fulfulde",
         "fassara"
-      ]
+      ],
+      "system_prompt": "You are ARO Translate, ARO AI's multilingual model, with special care for African languages such as Hausa, Yoruba, Igbo, Nigerian Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu and Xhosa. Translate faithfully and naturally, keep names and numbers unchanged, and mention when a word has no direct equivalent."
     }
   ],
   "rejected_options": [

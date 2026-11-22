@@ -3,7 +3,7 @@
 Free Colab T4 (16 GB) is enough for Qwen3-4B in 4-bit. The result is a
 small LoRA adapter (~100 MB) that vLLM serves on top of the base model.
 
-    python -m aro_training.train --data data/train.jsonl --out outputs/run-2026-11-22
+    python -m aro_training.train --model aro-code     # data/aro-code/train.jsonl → outputs/aro-code/run-…
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import CONFIG, Config
+from .models import spec as model_spec
 
 
 def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
@@ -40,7 +41,13 @@ def _filter_kwargs(cls: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in kwargs.items() if k in accepted}
 
 
-def train(data_path: str, out_dir: str, cfg: Config = CONFIG, init_adapter: str | None = None) -> Path:
+def train(
+    data_path: str,
+    out_dir: str,
+    cfg: Config = CONFIG,
+    init_adapter: str | None = None,
+    model_id: str = "aro-1.5",
+) -> Path:
     # Imported here so the rest of the package works without a GPU.
     from unsloth import FastLanguageModel  # noqa: I001  (must be imported before transformers)
     from unsloth.chat_templates import train_on_responses_only
@@ -50,9 +57,12 @@ def train(data_path: str, out_dir: str, cfg: Config = CONFIG, init_adapter: str 
     examples = load_jsonl(data_path)
     if not examples:
         raise SystemExit(f"No training examples in {data_path}")
+    aro_model = model_spec(model_id)
+    if not aro_model.trainable:
+        raise SystemExit(f"{aro_model.name} isn't a shared-foundation text model; it has its own training stack.")
 
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=init_adapter or cfg.base_model,
+        model_name=init_adapter or aro_model.base_model,
         max_seq_length=cfg.max_seq_length,
         load_in_4bit=True,
     )
@@ -108,8 +118,9 @@ def train(data_path: str, out_dir: str, cfg: Config = CONFIG, init_adapter: str 
     model.save_pretrained(str(adapter_dir))
     tokenizer.save_pretrained(str(adapter_dir))
     manifest = {
-        "model_name": cfg.model_name,
-        "base_model": cfg.base_model,
+        "model_id": aro_model.id,
+        "model_name": aro_model.served_name,
+        "base_model": aro_model.base_model,
         "examples": len(examples),
         "train_loss": getattr(stats, "training_loss", None),
         "minutes": round((time.time() - started) / 60, 1),
@@ -122,12 +133,15 @@ def train(data_path: str, out_dir: str, cfg: Config = CONFIG, init_adapter: str 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fine-tune ARO with QLoRA")
-    parser.add_argument("--data", default=f"{CONFIG.data_dir}/train.jsonl")
-    parser.add_argument("--out", default=f"{CONFIG.output_dir}/run-{time.strftime('%Y%m%d-%H%M')}")
+    parser = argparse.ArgumentParser(description="Fine-tune an ARO text model with QLoRA")
+    parser.add_argument("--model", default="aro-1.5", help="aro-1.5, aro-code, aro-research or aro-translate")
+    parser.add_argument("--data", default=None, help="Default: data/<model>/train.jsonl")
+    parser.add_argument("--out", default=None, help="Default: outputs/<model>/run-<time>")
     parser.add_argument("--from-adapter", default=None, help="Continue training an existing ARO adapter")
     args = parser.parse_args()
-    train(args.data, args.out, init_adapter=args.from_adapter)
+    data = args.data or f"{CONFIG.data_dir}/{args.model}/train.jsonl"
+    out = args.out or f"{CONFIG.output_dir}/{args.model}/run-{time.strftime('%Y%m%d-%H%M')}"
+    train(data, out, init_adapter=args.from_adapter, model_id=args.model)
 
 
 if __name__ == "__main__":

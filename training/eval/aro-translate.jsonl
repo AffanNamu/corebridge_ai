@@ -1,0 +1,21 @@
+{"id": "translate-identity", "category": "identity", "critical": true, "prompt": "Who are you?", "must_include": ["ARO"], "must_not_include": ["I am Qwen", "I'm Qwen", "I am ChatGPT", "I'm Claude"]}
+{"id": "tr-ha-thanks", "category": "hausa", "prompt": "Translate 'Thank you' into Hausa.", "must_include": ["na gode"]}
+{"id": "tr-ha-water", "category": "hausa", "prompt": "What is the Hausa word for 'water'?", "must_include": ["ruwa"]}
+{"id": "tr-ha-morning", "category": "hausa", "prompt": "How do you say 'Good morning' in Hausa?", "must_include": ["ina kwana|barka da safiya"]}
+{"id": "tr-yo-thanks", "category": "yoruba", "prompt": "Translate 'Thank you' into Yoruba.", "must_include": ["e se|ese|o se|e dupe|a dupe"]}
+{"id": "tr-yo-water", "category": "yoruba", "prompt": "What is the Yoruba word for 'water'?", "must_include": ["omi"]}
+{"id": "tr-ig-thanks", "category": "igbo", "prompt": "Translate 'Thank you' into Igbo.", "must_include": ["daalu|imela"]}
+{"id": "tr-ig-water", "category": "igbo", "prompt": "What is the Igbo word for 'water'?", "must_include": ["mmiri"]}
+{"id": "tr-sw-thanks", "category": "swahili", "prompt": "Translate 'Thank you' into Swahili.", "must_include": ["asante"]}
+{"id": "tr-sw-water", "category": "swahili", "prompt": "What is the Swahili word for 'water'?", "must_include": ["maji"]}
+{"id": "tr-zu-thanks", "category": "zulu", "prompt": "Translate 'Thank you' into Zulu.", "must_include": ["ngiyabonga"]}
+{"id": "tr-xh-thanks", "category": "xhosa", "prompt": "Translate 'Thank you' into Xhosa.", "must_include": ["enkosi"]}
+{"id": "tr-am-thanks", "category": "amharic", "prompt": "Translate 'Thank you' into Amharic.", "must_include": ["አመሰግናለሁ|ameseginalehu|amesegnalehu"]}
+{"id": "tr-ar-thanks", "category": "arabic", "prompt": "Translate 'Thank you' into Arabic.", "must_include": ["شكرا|shukran"]}
+{"id": "tr-wo-thanks", "category": "wolof", "prompt": "Translate 'Thank you' into Wolof.", "must_include": ["jerejef|jërëjëf"]}
+{"id": "tr-ff-thanks", "category": "fulfulde", "prompt": "Translate 'Thank you' into Fulfulde.", "must_include": ["a jaaraama|jaaraama|on jaaraama"]}
+{"id": "tr-langid-ha", "category": "language-id", "prompt": "Which language is this sentence in: 'Ina son karatu sosai.'?", "must_include": ["hausa"]}
+{"id": "tr-langid-yo", "category": "language-id", "prompt": "Which language is this sentence in: 'Mo fẹ́ jẹun.'?", "must_include": ["yoruba"]}
+{"id": "tr-langid-sw", "category": "language-id", "prompt": "Which language is this sentence in: 'Ninapenda kusoma vitabu.'?", "must_include": ["swahili"]}
+{"id": "tr-names", "category": "faithfulness", "critical": true, "prompt": "Translate into Hausa, keeping the name and number unchanged: 'Musa bought 12 books.'", "must_include": ["musa", "12"]}
+{"id": "tr-pcm", "category": "pidgin", "prompt": "Translate into Nigerian Pidgin: 'What are you doing?'", "must_include": ["wetin|wetin you dey do|wetin una dey do"]}

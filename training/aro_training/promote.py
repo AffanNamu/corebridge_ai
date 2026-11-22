@@ -1,14 +1,14 @@
 """Publishes an accepted ARO adapter to a private Hugging Face repo.
 
-Layout of the Hub repo (ARO_HUB_REPO, e.g. "your-org/aro-1.5"):
+One private Hub repo per model, <ARO_HUB_NAMESPACE>/<model> (e.g. "your-org/aro-code"):
     versions/<version>/   adapter files + aro_manifest.json
     current.json          {"version": "<version>", "history": [...]}
 
 The model server loads versions/<current>/ (see scripts/serve_vllm.sh).
 Rolling back just points current.json at an earlier version.
 
-    python -m aro_training.promote publish outputs/run-.../adapter --report outputs/eval_report.json
-    python -m aro_training.promote rollback
+    python -m aro_training.promote --model aro-code publish outputs/aro-code/run-.../adapter --report .../eval_report.json
+    python -m aro_training.promote --model aro-code rollback
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .config import CONFIG
+from .models import spec as model_spec
 
 CURRENT_FILE = "current.json"
 
@@ -66,9 +66,10 @@ def _write_pointer(repo: str, pointer: dict[str, Any], message: str) -> None:
         _api().upload_file(path_or_fileobj=str(path), path_in_repo=CURRENT_FILE, repo_id=repo, commit_message=message)
 
 
-def publish(adapter_dir: str, report: str | None, repo: str = CONFIG.hub_repo) -> str:
+def publish(adapter_dir: str, report: str | None, repo: str | None = None, model_id: str = "aro-1.5") -> str:
+    repo = repo or model_spec(model_id).hub_repo()
     if not repo:
-        raise SystemExit("Set ARO_HUB_REPO (e.g. your-org/aro-1.5) to publish.")
+        raise SystemExit("Set ARO_HUB_NAMESPACE (e.g. your-hf-org) — or ARO_HUB_REPO for ARO 1.5 — to publish.")
     if report:
         decision = json.loads(Path(report).read_text())
         if not decision.get("promote"):
@@ -84,7 +85,8 @@ def publish(adapter_dir: str, report: str | None, repo: str = CONFIG.hub_repo) -
     return version
 
 
-def rollback(repo: str = CONFIG.hub_repo) -> str:
+def rollback(repo: str | None = None, model_id: str = "aro-1.5") -> str:
+    repo = repo or model_spec(model_id).hub_repo()
     pointer = _read_pointer(repo)
     if not pointer:
         raise SystemExit("Nothing published yet.")
@@ -96,6 +98,7 @@ def rollback(repo: str = CONFIG.hub_repo) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Publish or roll back ARO versions on the Hugging Face Hub")
+    parser.add_argument("--model", default="aro-1.5")
     sub = parser.add_subparsers(dest="command", required=True)
     pub = sub.add_parser("publish")
     pub.add_argument("adapter_dir")
@@ -103,9 +106,9 @@ def main() -> None:
     sub.add_parser("rollback")
     args = parser.parse_args()
     if args.command == "publish":
-        publish(args.adapter_dir, args.report)
+        publish(args.adapter_dir, args.report, model_id=args.model)
     else:
-        rollback()
+        rollback(model_id=args.model)
 
 
 if __name__ == "__main__":
