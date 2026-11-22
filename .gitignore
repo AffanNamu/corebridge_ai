@@ -62,3 +62,5 @@ training/data/*.jsonl
 service-account*.json
 firestore/node_modules/
 firestore-debug.log
+training/live_server.pid
+training/*.log

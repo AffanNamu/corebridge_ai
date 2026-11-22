@@ -1,0 +1,23 @@
+name: Training CI
+
+on:
+  push:
+    paths: ["training/**", ".github/workflows/training-ci.yml"]
+  pull_request:
+    paths: ["training/**", ".github/workflows/training-ci.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: training
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Only the GPU-free parts are tested here.
+      - run: pip install pytest httpx
+      - run: python -m pytest -q
+      - run: bash -n scripts/serve_vllm.sh && bash -n scripts/daily.sh && bash -n scripts/live_server.sh
