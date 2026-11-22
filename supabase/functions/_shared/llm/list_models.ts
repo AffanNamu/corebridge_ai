@@ -13,9 +13,10 @@ export async function listModels(
   apiKey: string | undefined,
   capability: Capability = 'chat',
   fetchImpl: typeof fetch = fetch,
-  env: Env = (name) => Deno.env.get(name),
+  _env: Env = (name) => Deno.env.get(name),
 ): Promise<string[]> {
-  if (provider === 'aro') return [env('ARO_MODEL_NAME')?.trim() || 'aro-1.5'];
+  // ARO's chat models; which ones a user may use is decided per request by their plan.
+  if (provider === 'aro') return ['auto', 'aro-1.5', 'aro-code', 'aro-research', 'aro-translate', 'aro-vision'];
 
   const key = apiKey?.trim();
   if (!key) throw new ProviderError(`No API key provided for ${provider}.`, 400, false);
