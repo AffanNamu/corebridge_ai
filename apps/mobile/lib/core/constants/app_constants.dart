@@ -12,6 +12,7 @@ class AppConstants {
   static const String artifactVersionsSubcollection = 'versions';
   static const String filesCollection = 'files';
   static const String promptLibraryCollection = 'promptLibrary';
+  static const String agentSessionsCollection = 'agentSessions';
 
   // Debounce/throttle
   static const Duration autosaveDebounce = Duration(milliseconds: 800);

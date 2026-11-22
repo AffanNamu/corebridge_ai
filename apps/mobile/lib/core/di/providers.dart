@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import '../../data/remote/cloudinary/cloudinary_service.dart';
 import '../../data/remote/firebase/firebase_service.dart';
+import '../../data/remote/github/github_api.dart';
+import '../../data/repositories_impl/agent_session_repository_impl.dart';
+import '../../domain/repositories/agent_session_repository.dart';
 import '../../data/remote/supabase/supabase_service.dart';
 import '../../data/repositories_impl/artifact_repository_impl.dart';
 import '../../data/repositories_impl/conversation_repository_impl.dart';
@@ -17,6 +20,7 @@ import '../../domain/repositories/project_repository.dart';
 import '../../domain/repositories/user_settings_repository.dart';
 import '../../domain/usecases/create_artifact_usecase.dart';
 import '../../domain/usecases/send_message_usecase.dart';
+import '../network/agent_client.dart';
 import '../network/api_client.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
@@ -80,4 +84,12 @@ final sendMessageUseCaseProvider = Provider<SendMessageUseCase>((ref) {
 });
 final createArtifactUseCaseProvider = Provider<CreateArtifactUseCase>((ref) {
   return CreateArtifactUseCase(ref.watch(artifactRepositoryProvider));
+});
+
+final gitHubApiProvider = Provider<GitHubApi>((ref) => GitHubApi());
+final agentClientProvider = Provider<AgentClient>((ref) {
+  return AgentClient(ref.watch(supabaseFunctionsUrlProvider));
+});
+final agentSessionRepositoryProvider = Provider<AgentSessionRepository>((ref) {
+  return AgentSessionRepositoryImpl(ref.watch(firestoreProvider));
 });

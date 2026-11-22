@@ -31,6 +31,8 @@ dependencies:
   intl: ^0.19.0
   file_picker: ^8.0.6
   connectivity_plus: ^6.0.5
+  # Open GitHub commits / pull requests from the coding agent
+  url_launcher: ^6.3.1
   # Attachments (image) + voice input
   image_picker: ^1.1.2
   permission_handler: ^11.3.1

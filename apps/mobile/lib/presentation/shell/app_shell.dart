@@ -14,6 +14,7 @@ class AppShell extends ConsumerWidget {
   static const _mainItems = [
     _NavItem('/home', Icons.home_outlined, 'Home'),
     _NavItem('/chat', Icons.chat_bubble_outline_rounded, 'Chat'),
+    _NavItem('/code', Icons.terminal_rounded, 'Code'),
     _NavItem('/projects', Icons.folder_special_outlined, 'Projects'),
     _NavItem('/artifacts', Icons.code_outlined, 'Artifacts'),
     _NavItem('/files', Icons.folder_copy_outlined, 'Files'),

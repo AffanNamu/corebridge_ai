@@ -6,6 +6,9 @@ import '../screens/api_providers_screen.dart';
 import '../screens/artifacts_screen.dart';
 import '../screens/auth_screen.dart';
 import '../screens/chat_screen.dart';
+import '../screens/code_screen.dart';
+import '../screens/repo_agent_screen.dart';
+import '../../domain/entities/github_repo.dart';
 import '../screens/files_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
@@ -36,6 +39,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
           GoRoute(path: '/chat', builder: (context, state) => const ChatScreen()),
+          GoRoute(path: '/code', builder: (context, state) => const CodeScreen()),
+          // Pushed from CodeScreen with the chosen repo as `extra`; falls back
+          // to the repo list if opened without one (e.g. after a restart).
+          GoRoute(
+            path: '/code/repo',
+            builder: (context, state) {
+              final repo = state.extra;
+              return repo is GitHubRepo ? RepoAgentScreen(repo: repo) : const CodeScreen();
+            },
+          ),
           GoRoute(path: '/projects', builder: (context, state) => const ProjectsScreen()),
           GoRoute(path: '/artifacts', builder: (context, state) => const ArtifactsScreen()),
           GoRoute(path: '/files', builder: (context, state) => const FilesScreen()),
