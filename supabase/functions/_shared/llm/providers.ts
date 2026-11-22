@@ -1,10 +1,8 @@
 // Resolves a provider choice from the app into concrete endpoints.
 //
 // - claude / openai / gemini / qwen: BYOK — the user's own key, sent per request.
-// - aro: ARO AI's own model (ARO 1.5). Runs on an OpenAI-compatible server
-//   (vLLM) that the ARO team operates, so users need no key. Configured with
-//   Supabase secrets; an optional fallback endpoint keeps chat working while
-//   the ARO server is offline (for example, a Colab test session that ended).
+// - aro: ARO AI's own models — resolved by _shared/aro.ts, which checks the
+//   user's plan first. They never go through this function.
 
 import { Endpoint, ProviderError, ProviderId } from './types.ts';
 
@@ -42,7 +40,9 @@ export function resolveEndpoints(
   purpose: 'chat' | 'agent' = 'chat',
   env: Env = defaultEnv,
 ): Endpoint[] {
-  if (provider === 'aro') return resolveAro(env);
+  if (provider === 'aro') {
+    throw new ProviderError('ARO models are resolved by resolveAro (entitlement check).', 500, false);
+  }
 
   const key = apiKey?.trim();
   if (!key) {
@@ -73,46 +73,4 @@ export function resolveEndpoints(
     model: model.trim(),
     servedBy: provider,
   }];
-}
-
-function resolveAro(env: Env): Endpoint[] {
-  const endpoints: Endpoint[] = [];
-
-  const baseUrl = env('ARO_MODEL_BASE_URL')?.trim();
-  if (baseUrl) {
-    endpoints.push({
-      provider: 'aro',
-      kind: 'openai',
-      baseUrl: stripSlash(baseUrl),
-      apiKey: env('ARO_MODEL_API_KEY')?.trim() || 'aro-no-key',
-      model: env('ARO_MODEL_NAME')?.trim() || 'aro-1.5',
-      servedBy: 'aro',
-    });
-  }
-
-  const fallbackUrl = env('ARO_FALLBACK_BASE_URL')?.trim();
-  const fallbackModel = env('ARO_FALLBACK_MODEL')?.trim();
-  if (fallbackUrl && fallbackModel) {
-    endpoints.push({
-      provider: 'aro',
-      kind: 'openai',
-      baseUrl: stripSlash(fallbackUrl),
-      apiKey: env('ARO_FALLBACK_API_KEY')?.trim() || 'aro-no-key',
-      model: fallbackModel,
-      servedBy: 'fallback',
-    });
-  }
-
-  if (endpoints.length === 0) {
-    throw new ProviderError(
-      `${ARO_DISPLAY_NAME} is not available yet. Please pick another model for now.`,
-      503,
-      false,
-    );
-  }
-  return endpoints;
-}
-
-function stripSlash(url: string): string {
-  return url.replace(/\/+$/, '');
 }

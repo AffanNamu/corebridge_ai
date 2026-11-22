@@ -3,6 +3,7 @@ import { handleRequest, parseMessages } from '../ai-router/handler.ts';
 import { rankClaude, rankGemini, rankOpenAI, rankQwen } from '../_shared/llm/list_models.ts';
 import { resolveEndpoints } from '../_shared/llm/providers.ts';
 import { readSseData } from '../_shared/http.ts';
+import { testDb } from './pg.ts';
 
 const user = { uid: 'user-1' };
 const verifyOk = () => Promise.resolve(user);
@@ -54,7 +55,9 @@ Deno.test('BYOK provider without a key is a 400 with a helpful message', async (
   assertStringIncludes((await res.json()).error, 'Settings → AI Providers');
 });
 
-Deno.test('ARO streams from the ARO server with its system prompt and meta frame', async () => {
+const pgOpts = { sanitizeResources: false, sanitizeOps: false };
+
+Deno.test({ name: 'ARO streams from the ARO server with its system prompt and meta frame', ...pgOpts, fn: async () => {
   let sentBody: any;
   const fetchImpl = (async (url: string, init: RequestInit) => {
     assertEquals(url, 'https://aro.example/v1/chat/completions');
@@ -68,23 +71,22 @@ Deno.test('ARO streams from the ARO server with its system prompt and meta frame
   }) as typeof fetch;
 
   const res = await handleRequest(
-    post({ provider: 'aro', messages: [{ role: 'user', content: 'hi' }], thinkingEnabled: true }),
-    {
-      verify: verifyOk,
-      fetchImpl,
-      env: envOf({ ARO_MODEL_BASE_URL: 'https://aro.example/v1/', ARO_MODEL_NAME: 'aro-1.5' }),
-    },
+    post({ provider: 'aro', model: 'aro-1.5', messages: [{ role: 'user', content: 'hi' }], thinkingEnabled: true }),
+    { verify: verifyOk, fetchImpl, db: await testDb(), env: envOf({ ARO_MODEL_BASE_URL: 'https://aro.example/v1/' }) },
   );
   const out = await frames(res);
-  assertEquals(out[0], { meta: { servedBy: 'aro', model: 'aro-1.5' } });
+  assertEquals(out[0].meta.servedBy, 'aro');
+  assertEquals(out[0].meta.model, 'aro-1.5');
+  assertEquals(out[0].meta.aroModel, 'aro-1.5');
+  assertEquals(out[0].meta.usage, { plan: 'free', via: 'plan', limit: 50, remaining: 49, credits: null });
   assertEquals(out[1], { thinking: 'hmm' });
   assertEquals(out.slice(2), [{ delta: 'Hello' }, { delta: ' world' }, '[DONE]']);
   assertEquals(sentBody.messages[0].role, 'system');
   assertStringIncludes(sentBody.messages[0].content, 'ARO 1.5');
   assertEquals(sentBody.chat_template_kwargs, { enable_thinking: true });
-});
+} });
 
-Deno.test('ARO falls back when its server is down, before any output', async () => {
+Deno.test({ name: 'ARO falls back when its server is down, before any output', ...pgOpts, fn: async () => {
   const calls: string[] = [];
   const fetchImpl = (async (url: string) => {
     calls.push(url);
@@ -95,6 +97,7 @@ Deno.test('ARO falls back when its server is down, before any output', async () 
   const res = await handleRequest(post({ provider: 'aro', messages: [{ role: 'user', content: 'hi' }] }), {
     verify: verifyOk,
     fetchImpl,
+    db: await testDb(),
     env: envOf({
       ARO_MODEL_BASE_URL: 'https://aro.example/v1',
       ARO_FALLBACK_BASE_URL: 'https://fallback.example/v1',
@@ -103,16 +106,30 @@ Deno.test('ARO falls back when its server is down, before any output', async () 
   });
   const out = await frames(res);
   assertEquals(calls.length, 2);
-  assertEquals(out[0], { meta: { servedBy: 'fallback', model: 'backup-model' } });
+  assertEquals([out[0].meta.servedBy, out[0].meta.model], ['fallback', 'backup-model']);
   assertEquals(out[1], { delta: 'from fallback' });
-});
+} });
 
-Deno.test('ARO without any configured server returns a clear 503', async () => {
+Deno.test({ name: 'ARO without any configured server returns a clear 503 and does not charge', ...pgOpts, fn: async () => {
+  const db = await testDb();
   const res = await handleRequest(post({ provider: 'aro', messages: [{ role: 'user', content: 'hi' }] }), {
     verify: verifyOk,
+    db,
     env: envOf({}),
   });
   assertEquals(res.status, 503);
+  const usage = await db.sql<{ requests: number }>("select requests from aro_usage_daily where user_id = 'user-1'");
+  assertEquals(usage[0]?.requests ?? 0, 0);
+} });
+
+Deno.test('ARO is refused when the plans database is not configured', async () => {
+  const res = await handleRequest(post({ provider: 'aro', messages: [{ role: 'user', content: 'hi' }] }), {
+    verify: verifyOk,
+    db: null,
+    env: envOf({ ARO_MODEL_BASE_URL: 'https://aro.example/v1' }),
+  });
+  assertEquals(res.status, 503);
+  assertStringIncludes((await res.json()).error, "plans aren't set up");
 });
 
 Deno.test('Claude streams text and thinking deltas, images become base64 blocks', async () => {

@@ -1,29 +1,39 @@
-// ai-router: streams chat replies from ARO 1.5 (ARO AI's own model) or the
-// user's own Claude / OpenAI / Gemini / Qwen key, and lists models a key
-// can use. Auth is a Firebase ID token.
+// ai-router: streams chat replies from ARO AI's own models or the user's
+// own Claude / OpenAI / Gemini / Qwen key, lists models a key can use, and
+// returns the user's plan overview. Auth is a Firebase ID token.
 //
 // Request body (POST, JSON):
-//   { action?: 'complete' | 'listModels', provider, model?, messages?,
-//     apiKey?, thinkingEnabled?, capability? }
+//   { action?: 'complete' | 'listModels' | 'overview', provider, model?,
+//     messages?, apiKey?, thinkingEnabled?, capability? }
+//
+// For provider 'aro', `model` is an ARO model id ('aro-1.5', 'aro-code',
+// 'aro-research', 'aro-translate', 'aro-vision') or 'auto' — the central
+// router then picks the specialist. Every ARO request is checked against
+// the user's plan in Postgres before any model is called.
 //
 // 'complete' replies with SSE frames:
-//   data: {"meta": {"servedBy": "aro" | "fallback" | "<provider>", "model": "..."}}
+//   data: {"meta": {"servedBy", "model", "aroModel"?, "routed"?, "notice"?, "usage"?}}
 //   data: {"thinking": "..."}   // reasoning, when the provider exposes it
 //   data: {"delta": "..."}      // answer text
 //   data: {"error": "..."}
 //   data: [DONE]
 
+import { type AroResolution, canTryNext, resolveAro } from '../_shared/aro.ts';
+import { type Db, dbFromEnv } from '../_shared/db.ts';
+import { isAdmin, overview, refund } from '../_shared/entitlements.ts';
 import type { VerifiedUser } from '../_shared/firebase-auth.ts';
 import { CORS_HEADERS, errorResponse, jsonResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
 import { streamChat } from '../_shared/llm/chat_stream.ts';
 import { Capability, listModels } from '../_shared/llm/list_models.ts';
-import { ARO_SYSTEM_PROMPT, resolveEndpoints } from '../_shared/llm/providers.ts';
+import { resolveEndpoints } from '../_shared/llm/providers.ts';
 import { type ChatMessage, type ContentPart, type Endpoint, isProviderId, ProviderError } from '../_shared/llm/types.ts';
 
 export interface RouterDeps {
   verify: (req: Request) => Promise<VerifiedUser | null>;
   env?: (name: string) => string | undefined;
   fetchImpl?: typeof fetch;
+  /** Entitlements database. Undefined = from env; null = not configured. */
+  db?: Db | null;
 }
 
 const MAX_MESSAGES = 200;
@@ -41,6 +51,18 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
     body = await req.json();
   } catch {
     return errorResponse('Invalid JSON body', 400);
+  }
+
+  const env = deps.env ?? ((name: string) => Deno.env.get(name));
+  const db = deps.db === undefined ? dbFromEnv(env) : deps.db;
+
+  if (body?.action === 'overview') {
+    if (!db) return errorResponse("Plans aren't set up on the server yet.", 503);
+    try {
+      return jsonResponse({ ...(await overview(db, user.uid)), is_admin: isAdmin(user.uid, env) });
+    } catch (err) {
+      return errorResponse(err instanceof Error ? err.message : 'Database error', 502);
+    }
   }
 
   const provider = body?.provider;
@@ -62,24 +84,54 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   if (typeof messages === 'string') return errorResponse(messages, 400);
 
   let endpoints: Endpoint[];
+  let aro: AroResolution | undefined;
   try {
-    endpoints = resolveEndpoints(provider, body.model, body.apiKey, 'chat', deps.env);
+    if (provider === 'aro') {
+      aro = await resolveAro(db, user.uid, body.model, messages, env);
+      endpoints = aro.endpoints;
+    } else {
+      endpoints = resolveEndpoints(provider, body.model, body.apiKey, 'chat', env);
+    }
   } catch (err) {
     return providerErrorResponse(err);
   }
 
-  const finalMessages: ChatMessage[] = provider === 'aro'
-    ? [{ role: 'system', content: ARO_SYSTEM_PROMPT }, ...messages]
+  const finalMessages: ChatMessage[] = aro
+    ? [{ role: 'system', content: aro.systemPrompt }, ...messages.filter((m) => m.role !== 'system')]
     : messages;
   const thinking = body.thinkingEnabled === true;
+  const metaExtra = aro
+    ? {
+      aroModel: aro.aroModel,
+      routed: aro.routed,
+      ...(aro.notice ? { notice: aro.notice } : {}),
+      usage: {
+        plan: aro.authorization.plan,
+        via: aro.authorization.via,
+        limit: aro.authorization.limit ?? null,
+        remaining: aro.authorization.remaining ?? null,
+        credits: aro.authorization.credits ?? null,
+      },
+    }
+    : {};
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let answered = false;
       try {
-        await streamWithFallback(endpoints, finalMessages, thinking, deps.fetchImpl, (frame) => controller.enqueue(frame));
+        await streamWithFallback(endpoints, finalMessages, thinking, deps.fetchImpl, (frame) => {
+          answered = true;
+          controller.enqueue(frame);
+        }, metaExtra);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown streaming error';
         controller.enqueue(sseFrame({ error: message }));
+        // Nothing was answered: give the request (or credits) back.
+        if (aro && db && !answered) {
+          await refund(db, user.uid, aro.aroModel, aro.authorization.via).catch((e) =>
+            console.error('ai-router: refund failed', e)
+          );
+        }
       } finally {
         controller.enqueue(SSE_DONE);
         controller.close();
@@ -101,6 +153,7 @@ export async function streamWithFallback(
   thinking: boolean,
   fetchImpl: typeof fetch | undefined,
   emit: (frame: Uint8Array) => void,
+  metaExtra: Record<string, unknown> = {},
 ): Promise<void> {
   let lastError: unknown;
   for (const [index, endpoint] of endpoints.entries()) {
@@ -109,15 +162,15 @@ export async function streamWithFallback(
       for await (const event of streamChat(endpoint, messages, { thinking, fetchImpl })) {
         if (!started) {
           started = true;
-          emit(sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model } }));
+          emit(sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model, ...metaExtra } }));
         }
         emit(sseFrame(event.type === 'thinking' ? { thinking: event.text } : { delta: event.text }));
       }
-      if (!started) emit(sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model } }));
+      if (!started) emit(sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model, ...metaExtra } }));
       return;
     } catch (err) {
       lastError = err;
-      const canRetry = !started && err instanceof ProviderError && err.retryable && index < endpoints.length - 1;
+      const canRetry = !started && canTryNext(err) && index < endpoints.length - 1;
       if (!canRetry) throw err;
       console.warn(`ai-router: ${endpoint.servedBy} failed, trying next endpoint: ${(err as Error).message}`);
     }

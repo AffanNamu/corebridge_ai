@@ -1,5 +1,5 @@
 {
-  "_doc": "The seven ARO models — the complete product catalogue. Source of truth for training (training/aro_training/models.py), the Supabase seed (supabase/migrations) and docs/MODELS.md. Statuses here are defaults; admins change live status/limits in the admin dashboard.",
+  "_doc": "The seven ARO models — the complete product catalogue. Source of truth for training (training/aro_training/models.py), the Supabase seed (supabase/migrations) and docs/MODELS.md. Statuses here are defaults; admins change live status/limits in the admin dashboard. Auto-routing rules (which specialist answers a request) live in supabase/functions/_shared/aro.ts.",
   "shared_foundation": {
     "base_model": "Qwen/Qwen3-4B",
     "license": "apache-2.0",
@@ -40,7 +40,6 @@
         "served_name": "aro-1.5",
         "endpoint": "text"
       },
-      "router_keywords": [],
       "system_prompt": "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5. Be accurate, concise and helpful. If you are not sure about something, say so."
     },
     {
@@ -83,30 +82,6 @@
           }
         ]
       },
-      "router_keywords": [
-        "code",
-        "function",
-        "bug",
-        "error",
-        "exception",
-        "stack trace",
-        "compile",
-        "api",
-        "database",
-        "sql",
-        "regex",
-        "python",
-        "javascript",
-        "typescript",
-        "dart",
-        "flutter",
-        "java",
-        "kotlin",
-        "react",
-        "git",
-        "unit test",
-        "refactor"
-      ],
       "system_prompt": "You are ARO Code, ARO AI's software engineering model. Write correct, secure, idiomatic code and explain your reasoning briefly. Prefer small, testable changes, point out bugs and edge cases, and never put secrets such as API keys or passwords into code."
     },
     {
@@ -142,26 +117,6 @@
         "endpoint": "text",
         "thinking_default": true
       },
-      "router_keywords": [
-        "prove",
-        "proof",
-        "theorem",
-        "equation",
-        "integral",
-        "derivative",
-        "calculate",
-        "probability",
-        "statistics",
-        "hypothesis",
-        "research",
-        "paper",
-        "thesis",
-        "experiment",
-        "physics",
-        "chemistry",
-        "biology",
-        "engineering analysis"
-      ],
       "system_prompt": "You are ARO Research, ARO AI's model for science, mathematics and advanced reasoning. Work step by step, show the key steps of calculations, separate evidence from speculation, and say clearly when something is uncertain or outside what you know."
     },
     {
@@ -198,7 +153,6 @@
         "endpoint": "vision",
         "upgrade_path": "Qwen/Qwen3-VL-8B-Instruct (apache-2.0)"
       },
-      "router_keywords": [],
       "system_prompt": "You are ARO Vision, ARO AI's visual intelligence model. Describe and analyse images, documents and screenshots accurately. Only state what you can actually see, and say when something is unclear."
     },
     {
@@ -247,8 +201,7 @@
             "gap": "no African-language voices yet"
           }
         ]
-      },
-      "router_keywords": []
+      }
     },
     {
       "id": "aro-creative",
@@ -301,8 +254,7 @@
             "license_checked": "2026-11-22 (Hugging Face API license tag)"
           }
         ]
-      },
-      "router_keywords": []
+      }
     },
     {
       "id": "aro-translate",
@@ -354,23 +306,6 @@
           "license_checked": "2026-11-22 (Hugging Face API license tag)"
         }
       },
-      "router_keywords": [
-        "translate",
-        "translation",
-        "in hausa",
-        "in yoruba",
-        "in igbo",
-        "in pidgin",
-        "in swahili",
-        "in arabic",
-        "in french",
-        "in amharic",
-        "in zulu",
-        "in xhosa",
-        "in wolof",
-        "in fulfulde",
-        "fassara"
-      ],
       "system_prompt": "You are ARO Translate, ARO AI's multilingual model, with special care for African languages such as Hausa, Yoruba, Igbo, Nigerian Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu and Xhosa. Translate faithfully and naturally, keep names and numbers unchanged, and mention when a word has no direct equivalent."
     }
   ],

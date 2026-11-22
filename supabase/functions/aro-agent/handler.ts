@@ -17,6 +17,9 @@
 //   status | text | tool | tool_result | commit | pull_request | error
 //   then `state` (save it and send it back next time), then `done`.
 
+import { type AroResolution, canTryNext, resolveAro } from '../_shared/aro.ts';
+import { type Db, dbFromEnv } from '../_shared/db.ts';
+import { refund } from '../_shared/entitlements.ts';
 import type { VerifiedUser } from '../_shared/firebase-auth.ts';
 import { GitHubClient, GitHubError } from '../_shared/github.ts';
 import { CORS_HEADERS, errorResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
@@ -39,6 +42,8 @@ export interface AgentDeps {
   env?: (name: string) => string | undefined;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  /** Entitlements database. Undefined = from env; null = not configured. */
+  db?: Db | null;
 }
 
 const MAX_STEPS_PER_REQUEST = 25;
@@ -92,9 +97,28 @@ export async function handleRequest(req: Request, deps: AgentDeps): Promise<Resp
   if (message.length > MAX_MESSAGE_CHARS) return errorResponse('Message is too long', 400);
   if (!message && body.continue !== true) return errorResponse('Send a message or continue: true', 400);
 
+  const env = deps.env ?? ((name: string) => Deno.env.get(name));
+  const db = deps.db === undefined ? dbFromEnv(env) : deps.db;
+
   let endpoints: Endpoint[];
+  let aro: AroResolution | undefined;
+  let aroNotice: string | undefined;
   try {
-    endpoints = resolveEndpoints(body.provider, body.model, body.apiKey, 'agent', deps.env);
+    if (body.provider === 'aro') {
+      // The agent runs on ARO Code; if the user's plan doesn't include it,
+      // ARO 1.5 does the work and the app says why. One request per run.
+      const routing = [{ role: 'user' as const, content: message || 'continue' }];
+      try {
+        aro = await resolveAro(db, user.uid, 'aro-code', routing, env);
+      } catch (err) {
+        if (!(err instanceof ProviderError) || ![402, 429, 503].includes(err.status) || !db) throw err;
+        aro = await resolveAro(db, user.uid, 'aro-1.5', routing, env);
+        aroNotice = `${err.message} ARO 1.5 is working on this instead.`;
+      }
+      endpoints = aro.endpoints;
+    } else {
+      endpoints = resolveEndpoints(body.provider, body.model, body.apiKey, 'agent', env);
+    }
   } catch (err) {
     return err instanceof ProviderError ? errorResponse(err.message, err.status) : errorResponse('Bad request', 400);
   }
@@ -132,11 +156,18 @@ export async function handleRequest(req: Request, deps: AgentDeps): Promise<Resp
     async start(controller) {
       const send = (payload: Record<string, unknown>) => controller.enqueue(sseFrame(payload));
       let status: 'completed' | 'paused' | 'error' = 'completed';
+      const progress = { modelTurns: 0 };
+      if (aroNotice) send({ type: 'status', text: aroNotice });
+      if (aro) send({ type: 'model', aroModel: aro.aroModel, usage: { plan: aro.authorization.plan, remaining: aro.authorization.remaining ?? null } });
       try {
-        status = await runAgent(state, endpoints, github, send, { fetchImpl: deps.fetchImpl, deadline: now() + budgetMs, now });
+        status = await runAgent(state, endpoints, github, send, { fetchImpl: deps.fetchImpl, deadline: now() + budgetMs, now, progress });
       } catch (err) {
         status = 'error';
         send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed' });
+        // The model never answered: give the request back.
+        if (aro && db && progress.modelTurns === 0) {
+          await refund(db, user.uid, aro.aroModel, aro.authorization.via).catch((e) => console.error('aro-agent: refund failed', e));
+        }
       } finally {
         state.transcript = compactTranscript(state.transcript);
         send({ type: 'state', state });
@@ -153,6 +184,7 @@ interface RunOptions {
   fetchImpl?: typeof fetch;
   deadline: number;
   now: () => number;
+  progress?: { modelTurns: number };
 }
 
 export async function runAgent(
@@ -173,6 +205,7 @@ export async function runAgent(
 
     send({ type: 'status', text: step === 0 ? 'Thinking…' : 'Working…' });
     const turn = await callWithFallback(endpoints, system, compactTranscript(state.transcript), options.fetchImpl);
+    if (options.progress) options.progress.modelTurns++;
 
     const assistant: AgentMessage = {
       role: 'assistant',
@@ -217,7 +250,7 @@ async function callWithFallback(
       return await chatWithTools(endpoint, system, transcript, TOOL_DEFINITIONS, { fetchImpl });
     } catch (err) {
       lastError = err;
-      if (!(err instanceof ProviderError && err.retryable && index < endpoints.length - 1)) throw err;
+      if (!(canTryNext(err) && index < endpoints.length - 1)) throw err;
     }
   }
   throw lastError;

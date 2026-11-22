@@ -3,6 +3,7 @@ import { handleRequest } from '../aro-agent/handler.ts';
 import { compactTranscript, createState, newWorkBranch, parseState } from '../aro-agent/state.ts';
 import { findSecrets, safePath } from '../aro-agent/tools.ts';
 import { readSseData } from '../_shared/http.ts';
+import { testDb } from './pg.ts';
 import { toAnthropicMessages, toOpenAIMessages, type AgentMessage } from '../_shared/llm/tool_chat.ts';
 
 // ------------------------------------------------------------ fake GitHub
@@ -303,22 +304,38 @@ Deno.test('edit_file reports helpful errors', async () => {
   assertStringIncludes(results[2].summary, 'Invalid path');
 });
 
-Deno.test('ARO drives the agent through its own server', async () => {
+Deno.test({ name: 'ARO runs the agent as ARO Code on Pro, and as ARO 1.5 (with a notice) on Free', sanitizeResources: false, sanitizeOps: false, fn: async () => {
+  const db = await testDb();
   const repo = fakeRepo({ 'a.txt': 'x\n' });
-  let modelUrl = '';
-  const inner = githubFetch(repo, () => ({ choices: [{ message: { role: 'assistant', content: 'Hello from ARO' } }] }));
-  const fetchImpl = (async (input: string, init?: RequestInit) => {
-    if (!input.includes('api.github.com')) modelUrl = input;
-    return await inner(input, init);
-  }) as typeof fetch;
-  const out = await events(await handleRequest(request({ ...base, provider: 'aro', apiKey: undefined, message: 'hi' }), {
-    verify,
-    fetchImpl,
-    env: (n) => ({ ARO_MODEL_BASE_URL: 'https://aro.example/v1' } as Record<string, string>)[n],
-  }));
-  assertEquals(modelUrl, 'https://aro.example/v1/chat/completions');
-  assertEquals(out.find((e) => e.type === 'text').text, 'Hello from ARO');
-});
+  const run = async () => {
+    const models: string[] = [];
+    const inner = githubFetch(repo, (body: any) => {
+      models.push(body.model);
+      return { choices: [{ message: { role: 'assistant', content: `Hello from ${body.model}` } }] };
+    });
+    const fetchImpl = (async (input: string, init?: RequestInit) => {
+      if (!input.includes('api.github.com')) assertEquals(input, 'https://aro.example/v1/chat/completions');
+      return await inner(input, init);
+    }) as typeof fetch;
+    const out = await events(await handleRequest(request({ ...base, provider: 'aro', apiKey: undefined, message: 'hi' }), {
+      verify,
+      fetchImpl,
+      db,
+      env: (n) => ({ ARO_MODEL_BASE_URL: 'https://aro.example/v1' } as Record<string, string>)[n],
+    }));
+    return { models, out };
+  };
+
+  const free = await run();
+  assertEquals(free.models, ['aro-1.5']);
+  assertStringIncludes(free.out.find((e) => e.type === 'status' && e.text.includes('ARO 1.5 is working')).text, "ARO Code isn't included in Free");
+  assertEquals(free.out.find((e) => e.type === 'text').text, 'Hello from aro-1.5');
+
+  await db.rpc('aro_admin_grant_plan', { p_admin: 'admin', p_user: 'u1', p_plan: 'pro', p_days: 30 });
+  const pro = await run();
+  assertEquals(pro.models, ['aro-code']);
+  assertEquals(pro.out.find((e) => e.type === 'model').aroModel, 'aro-code');
+} });
 
 Deno.test('path safety and secret detection', () => {
   assertEquals(safePath('./src/a.ts'), 'src/a.ts');
