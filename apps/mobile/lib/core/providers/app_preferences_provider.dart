@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 final responseStyleProvider = StateProvider<String>((ref) => 'Balanced');
 final contextLengthProvider = StateProvider<String>((ref) => 'Long');
 final codeModeProvider = StateProvider<bool>((ref) => true);
-final privacyModeProvider = StateProvider<bool>((ref) => false);
 final emailNotificationsProvider = StateProvider<bool>((ref) => true);
 final inAppNotificationsProvider = StateProvider<bool>((ref) => true);
 final tipsNotificationsProvider = StateProvider<bool>((ref) => false);

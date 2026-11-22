@@ -18,6 +18,18 @@ abstract class ConversationRepository {
     required String conversationId,
     required MessageRole role,
     required String content,
+    String? thinking,
+    String? provider,
+    String? model,
+    String? servedBy,
+  });
+
+  /// Saves the user's 👍 (1) / 👎 (-1) and optional better answer.
+  Future<Result<void>> rateMessage({
+    required String conversationId,
+    required String messageId,
+    required int rating,
+    String? correction,
   });
   Stream<AiStreamEvent> streamAssistantReply({
     required String conversationId,

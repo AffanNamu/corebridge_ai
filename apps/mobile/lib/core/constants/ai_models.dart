@@ -10,6 +10,11 @@
 class AiModels {
   AiModels._();
 
+  /// ARO AI's own model. Served by the ARO model server through ai-router,
+  /// so users never need a key for it.
+  static const String aroDefault = 'aro-1.5';
+  static const String aroDisplayName = 'ARO 1.5';
+
   static const String claudeDefault = 'claude-sonnet-5';
   static const String claudeFast = 'claude-haiku-4-5-20251001';
   static const String claudeMax = 'claude-opus-4-8';
@@ -34,6 +39,8 @@ class AiModels {
   /// Maps a provider key to its recommended default model.
   static String defaultFor(String provider) {
     switch (provider) {
+      case 'aro':
+        return aroDefault;
       case 'claude':
         return claudeDefault;
       case 'openai':
@@ -55,6 +62,7 @@ class AiModels {
       case 'qwen':
         // Qwen's default (qwen3.7-max) is text-only, so we must swap to VL
         return qwenVision;
+      case 'aro':
       case 'claude':
       case 'openai':
       case 'gemini':

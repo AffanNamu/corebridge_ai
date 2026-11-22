@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/ai_models.dart';
 import '../../core/error/failures.dart';
 import '../../core/network/api_client.dart';
 import '../../core/utils/cancel_token.dart';
@@ -85,6 +84,10 @@ class ConversationRepositoryImpl implements ConversationRepository {
     required String conversationId,
     required MessageRole role,
     required String content,
+    String? thinking,
+    String? provider,
+    String? model,
+    String? servedBy,
   }) async {
     try {
       final now = DateTime.now();
@@ -93,7 +96,11 @@ class ConversationRepositoryImpl implements ConversationRepository {
         conversationId: conversationId,
         role: role,
         content: content,
+        thinking: thinking ?? '',
         createdAt: now,
+        provider: provider,
+        model: model,
+        servedBy: servedBy,
       );
       final docRef = await _conversations
           .doc(conversationId)
@@ -111,6 +118,26 @@ class ConversationRepositoryImpl implements ConversationRepository {
   }
 
   @override
+  Future<Result<void>> rateMessage({
+    required String conversationId,
+    required String messageId,
+    required int rating,
+    String? correction,
+  }) async {
+    try {
+      final trimmed = correction?.trim();
+      await _conversations.doc(conversationId).collection(AppConstants.messagesSubcollection).doc(messageId).update({
+        'rating': rating,
+        'correction': (trimmed == null || trimmed.isEmpty) ? FieldValue.delete() : trimmed,
+        'ratedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+      return Result.success(null);
+    } catch (e) {
+      return Result.failure(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Stream<AiStreamEvent> streamAssistantReply({
     required String conversationId,
     required String provider,
@@ -122,12 +149,9 @@ class ConversationRepositoryImpl implements ConversationRepository {
     bool thinkingEnabled = false,
     CancelToken? cancelToken,
   }) {
-    // Some providers' default/selected model can't see images at all
-    // (e.g. Qwen3.7 Max is text-only). When attachments are present,
-    // swap to that provider's vision-capable model for this call only —
-    // the user's picked model in the UI/history is untouched.
-    final effectiveModel = attachments.isNotEmpty ? AiModels.visionModelFor(provider, model) : model;
-
+    // `model` is already vision-capable when there are attachments — see
+    // UserApiKeys.modelFor(hasImages:), which uses the user's detected
+    // Qwen vision model instead of a hardcoded one.
     final List<Map<String, dynamic>> messages = [
       ...history,
       _buildUserTurn(userMessage, attachments),
@@ -135,7 +159,7 @@ class ConversationRepositoryImpl implements ConversationRepository {
 
     return _aiRouter.streamCompletion(
       provider: provider,
-      model: effectiveModel,
+      model: model,
       messages: messages,
       apiKey: apiKey,
       thinkingEnabled: thinkingEnabled,

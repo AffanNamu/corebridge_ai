@@ -79,6 +79,15 @@ class AiRouterClient {
             if (decoded['error'] != null) {
               throw HttpException(decoded['error'] as String);
             }
+            final meta = decoded['meta'];
+            if (meta is Map) {
+              yield AiStreamEvent(
+                type: AiStreamEventType.meta,
+                servedBy: meta['servedBy'] as String?,
+                model: meta['model'] as String?,
+              );
+              continue;
+            }
             final thinkingDelta = decoded['thinking'] as String?;
             if (thinkingDelta != null && thinkingDelta.isNotEmpty) {
               yield AiStreamEvent(type: AiStreamEventType.thinking, text: thinkingDelta);

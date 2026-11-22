@@ -14,6 +14,8 @@ class AiModelOption {
 }
 
 final availableModels = <AiModelOption>[
+  // ARO 1.5 is ARO AI's own model — first, so it's the default for new users.
+  AiModelOption(provider: 'aro', label: 'ARO 1.5', supportsThinking: true, supportsVision: false),
   AiModelOption(provider: 'claude', label: 'Claude', supportsThinking: true, supportsVision: true),
   AiModelOption(provider: 'openai', label: 'ChatGPT', supportsThinking: false, supportsVision: true),
   AiModelOption(provider: 'gemini', label: 'Gemini', supportsThinking: true, supportsVision: true),

@@ -51,6 +51,50 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
 
   String? _keyFor(String provider) => _keys.forProvider(provider);
 
+  String _providerName(String key) {
+    if (key == 'aro') return AiModels.aroDisplayName;
+    return _providers.firstWhere((p) => p.key == key, orElse: () => _ProviderMeta(key, key, AppColors.accentBlue, Icons.hub_rounded)).name;
+  }
+
+  /// ARO 1.5 is built in: no key, always listed first.
+  Widget _buildAroTile() {
+    final isDefault = (_keys.defaultProvider ?? '').isEmpty || _keys.defaultProvider == 'aro';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.accentBlue.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(gradient: AppColors.brandGradient, borderRadius: BorderRadius.circular(AppRadii.sm)),
+            alignment: Alignment.center,
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(AiModels.aroDisplayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                const Text("ARO AI's own model — built in, no key needed", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              ],
+            ),
+          ),
+          if (isDefault)
+            const Text('Default', style: TextStyle(color: AppColors.accentBlue, fontSize: 12, fontWeight: FontWeight.w600))
+          else
+            TextButton(onPressed: () => _setDefault('aro'), child: const Text('Set default')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _save(UserApiKeys updated) async {
     final uid = ref.read(firebaseServiceProvider).currentUserId;
     if (uid == null) return;
@@ -65,7 +109,7 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
     await _save(_keys.copyWith(defaultProvider: providerKey));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${_providers.firstWhere((p) => p.key == providerKey).name} set as your default')),
+        SnackBar(content: Text('${_providerName(providerKey)} set as your default')),
       );
     }
   }
@@ -82,7 +126,22 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
 
       if (models.isEmpty) return;
 
-      final updated = _applyModel(providerKey, models.first);
+      var updated = _applyModel(_keys, providerKey, models.first);
+
+      // Qwen keeps its vision-capable models under separate ids, so detect
+      // one too — images sent with Qwen use it (UserApiKeys.modelFor).
+      if (providerKey == 'qwen') {
+        try {
+          final visionModels = await ref.read(aiRouterClientProvider).listModels(
+                provider: providerKey,
+                apiKey: apiKey,
+                capability: 'vision',
+              );
+          if (visionModels.isNotEmpty) updated = updated.copyWith(qwenVisionModel: visionModels.first);
+        } catch (_) {
+          // Text chat still works without a detected vision model.
+        }
+      }
       await _save(updated);
 
       if (mounted) {
@@ -127,7 +186,7 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
     );
 
     if (result != null && result.isNotEmpty) {
-      var updated = _applyKey(provider.key, result);
+      var updated = _applyKey(_keys, provider.key, result);
       // First-ever connected provider becomes the default automatically
       // — most users only ever connect one, and this way "def is the
       // one in the chat screen" holds true without an extra tap.
@@ -177,7 +236,7 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
     );
 
     if (result != null) {
-      final updated = _applyModel(provider.key, result);
+      final updated = _applyModel(_keys, provider.key, result);
       await _save(updated);
     }
   }
@@ -200,8 +259,9 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
     );
 
     if (confirmed == true) {
-      var updated = _applyKey(provider.key, '');
-      updated = _applyModel(provider.key, updated);
+      var updated = _applyKey(_keys, provider.key, '');
+      updated = _applyModel(updated, provider.key, '');
+      if (provider.key == 'qwen') updated = updated.copyWith(qwenVisionModel: '');
       // Clear the default if this provider WAS the default — leaving a
       // default pointing at a removed key would silently break Chat.
       if (_keys.defaultProvider == provider.key) {
@@ -211,33 +271,35 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
     }
   }
 
-  UserApiKeys _applyKey(String providerKey, String value) {
+  /// Returns [base] with the provider's key set. Taking the base explicitly
+  /// lets several changes be chained without losing earlier ones.
+  static UserApiKeys _applyKey(UserApiKeys base, String providerKey, String value) {
     switch (providerKey) {
       case 'claude':
-        return _keys.copyWith(claude: value);
+        return base.copyWith(claude: value);
       case 'openai':
-        return _keys.copyWith(openai: value);
+        return base.copyWith(openai: value);
       case 'gemini':
-        return _keys.copyWith(gemini: value);
+        return base.copyWith(gemini: value);
       case 'qwen':
-        return _keys.copyWith(qwen: value);
+        return base.copyWith(qwen: value);
       default:
-        return _keys;
+        return base;
     }
   }
 
-  UserApiKeys _applyModel(String providerKey, [String value = '']) {
+  static UserApiKeys _applyModel(UserApiKeys base, String providerKey, String value) {
     switch (providerKey) {
       case 'claude':
-        return _keys.copyWith(claudeModel: value);
+        return base.copyWith(claudeModel: value);
       case 'openai':
-        return _keys.copyWith(openaiModel: value);
+        return base.copyWith(openaiModel: value);
       case 'gemini':
-        return _keys.copyWith(geminiModel: value);
+        return base.copyWith(geminiModel: value);
       case 'qwen':
-        return _keys.copyWith(qwenModel: value);
+        return base.copyWith(qwenModel: value);
       default:
-        return _keys;
+        return base;
     }
   }
 
@@ -258,6 +320,8 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 20),
+                _buildAroTile(),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Text('Connected Providers', style: Theme.of(context).textTheme.titleLarge),

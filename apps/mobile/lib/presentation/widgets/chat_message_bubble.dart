@@ -11,11 +11,15 @@ class ChatMessageBubble extends StatefulWidget {
   final bool isError;
   final VoidCallback? onRewrite;
 
+  /// Called with 1 (👍) or -1 (👎). Null hides the feedback buttons.
+  final void Function(int rating)? onRate;
+
   const ChatMessageBubble({
     super.key,
     required this.message,
     this.isError = false,
     this.onRewrite,
+    this.onRate,
   });
 
   @override
@@ -375,6 +379,23 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                     },
                   ),
                   if (widget.onRewrite != null) _MiniIconButton(icon: Icons.refresh_rounded, onTap: widget.onRewrite!),
+                  if (widget.onRate != null) ...[
+                    _MiniIconButton(
+                      icon: widget.message.rating == 1 ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined,
+                      color: widget.message.rating == 1 ? AppColors.accentBlue : null,
+                      onTap: () => widget.onRate!(1),
+                    ),
+                    _MiniIconButton(
+                      icon: widget.message.rating == -1 ? Icons.thumb_down_alt_rounded : Icons.thumb_down_alt_outlined,
+                      color: widget.message.rating == -1 ? AppColors.accentViolet : null,
+                      onTap: () => widget.onRate!(-1),
+                    ),
+                  ],
+                  if (widget.message.servedBy == 'fallback')
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Text('Answered by backup model — ARO is offline', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                    ),
                 ],
               ),
             ),
@@ -387,14 +408,15 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
 class _MiniIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _MiniIconButton({required this.icon, required this.onTap});
+  final Color? color;
+  const _MiniIconButton({required this.icon, required this.onTap, this.color});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
-      child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, size: 16, color: AppColors.textMuted)),
+      child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, size: 16, color: color ?? AppColors.textMuted)),
     );
   }
 }

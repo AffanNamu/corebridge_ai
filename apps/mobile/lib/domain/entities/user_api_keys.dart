@@ -1,8 +1,9 @@
 import '../../core/constants/ai_models.dart';
 
-/// Per-user, per-provider API keys, model strings, and a default
-/// provider choice — so a user only has to pick "Claude" once in
-/// Settings and every new chat opens with that provider pre-selected.
+/// Per-user, per-provider API keys, model strings, a default provider
+/// choice, and the user's GitHub connection for the ARO coding agent.
+///
+/// ARO 1.5 ('aro') is ARO AI's own model and needs no key.
 class UserApiKeys {
   final String? claude;
   final String? openai;
@@ -14,11 +15,19 @@ class UserApiKeys {
   final String? geminiModel;
   final String? qwenModel;
 
-  /// Provider key ('claude'/'openai'/'gemini'/'qwen') the user picked as
-  /// their default in API Providers. Null/empty means no preference set
-  /// yet — the app falls back to whatever selectedModelProvider was
-  /// already seeded with (Claude).
+  /// Qwen's vision models are separate ids from its chat models, so the
+  /// one detected for the user's key is stored on its own.
+  final String? qwenVisionModel;
+
+  /// Provider key ('aro'/'claude'/'openai'/'gemini'/'qwen') the user picked
+  /// as their default. Null/empty means no preference — ARO 1.5 is used.
   final String? defaultProvider;
+
+  /// Fine-grained GitHub personal access token for the coding agent.
+  final String? github;
+
+  /// GitHub username the token belongs to (shown in the app).
+  final String? githubLogin;
 
   const UserApiKeys({
     this.claude,
@@ -29,7 +38,10 @@ class UserApiKeys {
     this.openaiModel,
     this.geminiModel,
     this.qwenModel,
+    this.qwenVisionModel,
     this.defaultProvider,
+    this.github,
+    this.githubLogin,
   });
 
   factory UserApiKeys.fromMap(Map<String, dynamic>? map) {
@@ -43,7 +55,10 @@ class UserApiKeys {
       openaiModel: map['openaiModel'] as String?,
       geminiModel: map['geminiModel'] as String?,
       qwenModel: map['qwenModel'] as String?,
+      qwenVisionModel: map['qwenVisionModel'] as String?,
       defaultProvider: map['defaultProvider'] as String?,
+      github: map['github'] as String?,
+      githubLogin: map['githubLogin'] as String?,
     );
   }
 
@@ -57,9 +72,17 @@ class UserApiKeys {
       if (openaiModel != null) 'openaiModel': openaiModel,
       if (geminiModel != null) 'geminiModel': geminiModel,
       if (qwenModel != null) 'qwenModel': qwenModel,
+      if (qwenVisionModel != null) 'qwenVisionModel': qwenVisionModel,
       if (defaultProvider != null) 'defaultProvider': defaultProvider,
+      if (github != null) 'github': github,
+      if (githubLogin != null) 'githubLogin': githubLogin,
     };
   }
+
+  /// Providers that run on the user's own API key. ARO does not.
+  static bool requiresKey(String provider) => provider != 'aro';
+
+  bool get hasGitHub => (github ?? '').trim().isNotEmpty;
 
   String? forProvider(String provider) {
     switch (provider) {
@@ -76,7 +99,14 @@ class UserApiKeys {
     }
   }
 
-  String modelFor(String provider) {
+  /// The model to call. When the message has images and the provider uses
+  /// separate vision models (Qwen), the detected vision model is preferred.
+  String modelFor(String provider, {bool hasImages = false}) {
+    if (hasImages && provider == 'qwen') {
+      final vision = qwenVisionModel?.trim();
+      if (vision != null && vision.isNotEmpty) return vision;
+      return AiModels.visionModelFor(provider, AiModels.qwenDefault);
+    }
     final override = _modelOverrideFor(provider)?.trim();
     if (override != null && override.isNotEmpty) return override;
     return AiModels.defaultFor(provider);
@@ -106,7 +136,10 @@ class UserApiKeys {
     String? openaiModel,
     String? geminiModel,
     String? qwenModel,
+    String? qwenVisionModel,
     String? defaultProvider,
+    String? github,
+    String? githubLogin,
   }) {
     return UserApiKeys(
       claude: claude ?? this.claude,
@@ -117,7 +150,10 @@ class UserApiKeys {
       openaiModel: openaiModel ?? this.openaiModel,
       geminiModel: geminiModel ?? this.geminiModel,
       qwenModel: qwenModel ?? this.qwenModel,
+      qwenVisionModel: qwenVisionModel ?? this.qwenVisionModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
+      github: github ?? this.github,
+      githubLogin: githubLogin ?? this.githubLogin,
     );
   }
 }

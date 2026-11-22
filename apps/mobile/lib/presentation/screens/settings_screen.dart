@@ -17,6 +17,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _displayName;
   bool _isLoadingProfile = true;
 
+  /// Opt-in: may this user's ARO 1.5 chats and feedback train ARO?
+  bool _trainingConsent = false;
+
   @override
   void initState() {
     super.initState();
@@ -30,8 +33,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) {
       setState(() {
         _displayName = doc.data()?['displayName'] as String?;
+        _trainingConsent = (doc.data()?['trainingConsent'] as bool?) ?? false;
         _isLoadingProfile = false;
       });
+    }
+  }
+
+  Future<void> _setTrainingConsent(bool allowed) async {
+    final uid = ref.read(firebaseServiceProvider).currentUserId;
+    if (uid == null) return;
+    setState(() => _trainingConsent = allowed);
+    try {
+      await ref.read(userSettingsRepositoryProvider).setTrainingConsent(uid, allowed);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _trainingConsent = !allowed);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't save. Check your connection.")));
     }
   }
 
@@ -135,7 +152,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final responseStyle = ref.watch(responseStyleProvider);
     final contextLength = ref.watch(contextLengthProvider);
     final codeMode = ref.watch(codeModeProvider);
-    final privacyMode = ref.watch(privacyModeProvider);
     final emailNotif = ref.watch(emailNotificationsProvider);
     final inAppNotif = ref.watch(inAppNotificationsProvider);
     final tipsNotif = ref.watch(tipsNotificationsProvider);
@@ -269,13 +285,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () => _showComingSoon('Data control'),
               ),
               _row(
-                icon: Icons.shield_outlined,
-                label: 'Privacy Mode',
-                subtitle: 'Hide history from being used for training.',
+                icon: Icons.volunteer_activism_outlined,
+                label: 'Help improve ARO',
+                subtitle: 'Allow your ARO 1.5 chats and 👍/👎 feedback to train future ARO models. Personal details are removed first. Chats with Claude, ChatGPT, Gemini or Qwen are never used.',
                 trailing: Switch(
-                  value: privacyMode,
-                  activeColor: AppColors.accentBlue,
-                  onChanged: (v) => ref.read(privacyModeProvider.notifier).state = v,
+                  value: _trainingConsent,
+                  activeThumbColor: AppColors.accentBlue,
+                  onChanged: _isLoadingProfile ? null : _setTrainingConsent,
                 ),
               ),
               _row(

@@ -170,7 +170,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // for it, regardless of where they'd scrolled to.
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
-    final placeholderId = '${DateTime.now().millisecondsSinceEpoch}-assistant';
+    // The reply's id switches to its Firestore id once it's saved, so the
+    // 👍/👎 buttons can update the stored message.
+    var placeholderId = '${DateTime.now().millisecondsSinceEpoch}-assistant';
     setState(() {
       _messages.add(MessageEntity(
         id: placeholderId,
@@ -205,20 +207,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final index = _messages.indexWhere((m) => m.id == placeholderId);
         if (index == -1) continue;
 
-        if (event.type == AiStreamEventType.thinking) {
-          setState(() {
-            _messages[index] = _messages[index].copyWith(
-              thinking: _messages[index].thinking + event.text,
-              isThinkingStreaming: true,
-            );
-          });
-        } else {
-          setState(() {
-            _messages[index] = _messages[index].copyWith(
-              content: _messages[index].content + event.text,
-              isThinkingStreaming: false,
-            );
-          });
+        switch (event.type) {
+          case AiStreamEventType.thinking:
+            setState(() {
+              _messages[index] = _messages[index].copyWith(
+                thinking: _messages[index].thinking + event.text,
+                isThinkingStreaming: true,
+              );
+            });
+          case AiStreamEventType.content:
+            setState(() {
+              _messages[index] = _messages[index].copyWith(
+                content: _messages[index].content + event.text,
+                isThinkingStreaming: false,
+              );
+            });
+          case AiStreamEventType.meta:
+            setState(() {
+              _messages[index] = _messages[index].copyWith(
+                provider: selectedModel.provider,
+                servedBy: event.servedBy,
+                model: event.model,
+              );
+            });
+            continue;
+          case AiStreamEventType.saved:
+            final savedId = event.messageId;
+            if (savedId != null) {
+              setState(() => _messages[index] = _messages[index].copyWith(id: savedId));
+              placeholderId = savedId;
+            }
+            continue;
         }
 
         // Only auto-follow the streaming reply if the user is already
@@ -251,6 +270,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _activeCancelToken = null;
       setState(() => _isSending = false);
     }
+  }
+
+  /// 👍 (1) or 👎 (-1). A 👎 asks for an optional better answer — those
+  /// corrections are the most valuable training data for ARO.
+  Future<void> _rate(MessageEntity message, int rating) async {
+    final conversationId = _conversationId;
+    if (conversationId == null || conversationId.startsWith('local-')) return;
+
+    String? correction;
+    if (rating == -1) {
+      correction = await _askForCorrection();
+      if (!mounted) return;
+    }
+    final newRating = message.rating == rating && correction == null ? 0 : rating;
+
+    final index = _messages.indexWhere((m) => m.id == message.id);
+    if (index != -1) {
+      setState(() => _messages[index] = _messages[index].copyWith(rating: newRating, correction: correction));
+    }
+    final result = await ref.read(conversationRepositoryProvider).rateMessage(
+          conversationId: conversationId,
+          messageId: message.id,
+          rating: newRating,
+          correction: correction,
+        );
+    if (!mounted) return;
+    result.when(
+      success: (_) {
+        if (newRating != 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Thanks for the feedback!'), duration: Duration(seconds: 1)),
+          );
+        }
+      },
+      error: (_) => ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't save your feedback. Try again.")),
+      ),
+    );
+  }
+
+  Future<String?> _askForCorrection() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surfaceRaised,
+        title: const Text('What would a better answer be?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 8,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: const InputDecoration(hintText: 'Optional — write the answer you expected'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Skip')),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim().isEmpty ? null : controller.text.trim()),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _stopGenerating() {
@@ -316,6 +399,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     isError: isError,
                                     onRewrite: (!isError && message.role == MessageRole.assistant && !message.isStreaming)
                                         ? () => _rewrite(message)
+                                        : null,
+                                    onRate: (!isError && message.role == MessageRole.assistant && !message.isStreaming && message.servedBy != null && !message.id.endsWith('-assistant'))
+                                        ? (rating) => _rate(message, rating)
                                         : null,
                                   );
                                 },

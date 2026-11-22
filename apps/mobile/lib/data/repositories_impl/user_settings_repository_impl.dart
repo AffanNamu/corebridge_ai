@@ -31,4 +31,18 @@ class UserSettingsRepositoryImpl implements UserSettingsRepository {
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     }, SetOptions(merge: true));
   }
+
+  @override
+  Future<bool> getTrainingConsent(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    return (doc.data()?['trainingConsent'] as bool?) ?? false;
+  }
+
+  @override
+  Future<void> setTrainingConsent(String uid, bool allowed) async {
+    await _firestore.collection('users').doc(uid).set({
+      'trainingConsent': allowed,
+      'trainingConsentUpdatedAt': DateTime.now().millisecondsSinceEpoch,
+    }, SetOptions(merge: true));
+  }
 }

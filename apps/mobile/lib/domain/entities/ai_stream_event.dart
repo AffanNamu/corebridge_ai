@@ -1,12 +1,36 @@
-enum AiStreamEventType { thinking, content }
+enum AiStreamEventType {
+  /// The model's visible reasoning.
+  thinking,
 
-/// A single chunk from the AI stream, tagged as either the model's
-/// internal reasoning ("thinking") or the actual answer ("content").
-/// Providers that don't support exposing thinking (currently OpenAI's
-/// chat endpoint) only ever emit `content` events.
+  /// Answer text.
+  content,
+
+  /// Who actually answered (ARO, the fallback model, or the user's provider).
+  meta,
+
+  /// The finished reply was saved to Firestore under [messageId].
+  saved,
+}
+
+/// A single event from the AI stream.
 class AiStreamEvent {
   final AiStreamEventType type;
   final String text;
 
-  const AiStreamEvent({required this.type, required this.text});
+  /// For [AiStreamEventType.meta]: 'aro', 'fallback', or the provider id.
+  final String? servedBy;
+
+  /// For [AiStreamEventType.meta]: the model that produced the answer.
+  final String? model;
+
+  /// For [AiStreamEventType.saved]: the Firestore id of the saved reply.
+  final String? messageId;
+
+  const AiStreamEvent({
+    required this.type,
+    this.text = '',
+    this.servedBy,
+    this.model,
+    this.messageId,
+  });
 }
