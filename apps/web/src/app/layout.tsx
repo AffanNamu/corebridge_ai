@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'CoreBridge AI',
+  title: 'ARO AI',
   description: 'A premium AI workspace for chat, artifacts, and files.',
 };
 

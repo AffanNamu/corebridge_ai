@@ -1,5 +1,5 @@
 name: corebridge_mobile
-description: CoreBridge AI — premium AI workspace, mobile app.
+description: ARO AI — AI workspace and GitHub coding agent, mobile app.
 publish_to: 'none'
 version: 0.1.0+1
 environment:

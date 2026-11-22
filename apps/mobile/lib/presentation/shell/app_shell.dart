@@ -56,7 +56,7 @@ class AppShell extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('CoreBridge AI', style: Theme.of(context).textTheme.titleLarge),
+                        Text('ARO AI', style: Theme.of(context).textTheme.titleLarge),
                         Text('Your AI workspace', style: Theme.of(context).textTheme.labelSmall),
                       ],
                     ),

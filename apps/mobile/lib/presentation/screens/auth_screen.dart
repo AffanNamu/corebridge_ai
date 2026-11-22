@@ -80,7 +80,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 42),
                     ),
                     const SizedBox(height: 16),
-                    Text('CoreBridge AI', style: Theme.of(context).textTheme.headlineLarge),
+                    Text('ARO AI', style: Theme.of(context).textTheme.headlineLarge),
                     const SizedBox(height: 32),
                     TextField(
                       controller: _emailController,

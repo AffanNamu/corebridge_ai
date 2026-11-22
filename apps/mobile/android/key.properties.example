@@ -1,4 +1,4 @@
 storePassword=your-keystore-password
 keyPassword=your-key-password
-keyAlias=corebridge
-storeFile=/absolute/path/to/corebridge-release.jks
+keyAlias=aro
+storeFile=/absolute/path/to/aro-release.jks

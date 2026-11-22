@@ -20,18 +20,18 @@ Future<void> main() async {
 
   await LocalCache.init();
 
-  runApp(const ProviderScope(child: CoreBridgeApp()));
+  runApp(const ProviderScope(child: AroApp()));
 }
 
-class CoreBridgeApp extends ConsumerWidget {
-  const CoreBridgeApp({super.key});
+class AroApp extends ConsumerWidget {
+  const AroApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'CoreBridge AI',
+      title: 'ARO AI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       routerConfig: router,

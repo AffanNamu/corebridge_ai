@@ -10,7 +10,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { crypto } from 'https://deno.land/std@0.224.0/crypto/mod.ts';
 import { encodeHex } from 'https://deno.land/std@0.224.0/encoding/hex.ts';
-import { verifyFirebaseToken } from '../ai-router/verify-firebase.ts';
+import { verifyFirebaseToken } from '../_shared/firebase-auth.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

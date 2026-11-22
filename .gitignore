@@ -1,5 +1,5 @@
 # ============================================================
-# CodeReach AI — .gitignore
+# ARO AI — .gitignore
 # ============================================================
 
 # Dart/Flutter/Pub
@@ -24,7 +24,11 @@ ios/Flutter/Generated.xcconfig
 ios/Flutter/ephemeral/
 ios/Flutter/.last_build_id
 
-# Android
+# Android — signing material must NEVER be committed
+*.jks
+**/key.properties
+**/*-base64.txt
+**/local.properties
 
 
 # Mac
@@ -41,6 +45,18 @@ ios/Flutter/.last_build_id
 
 # Supabase local dev (if you use supabase cli later)
 supabase/.temp/
-supabase/.envnode_modules/
+supabase/.env
+node_modules/
 apps/web/node_modules/
 apps/web/.next/
+
+# Python / training
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+training/outputs/
+training/data/*.jsonl
+*.safetensors
+*.gguf
+service-account*.json

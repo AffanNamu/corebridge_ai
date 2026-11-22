@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'CoreBridge AI';
+  static const String appName = 'ARO AI';
 
   // Firestore collection names — keep in sync with docs/ARCHITECTURE.md
   static const String usersCollection = 'users';

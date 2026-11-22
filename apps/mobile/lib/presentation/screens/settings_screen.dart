@@ -185,7 +185,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           _sectionCard(
             title: 'Appearance',
-            subtitle: 'Customize the look and feel of CoreBridge AI.',
+            subtitle: 'Customize the look and feel of ARO AI.',
             children: [
               _row(
                 icon: Icons.wb_sunny_outlined,

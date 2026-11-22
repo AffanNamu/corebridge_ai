@@ -10,7 +10,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 import { Document, Packer, Paragraph, TextRun } from 'https://esm.sh/docx@8.5.0';
 import { BlobWriter, BlobReader, ZipWriter } from 'https://esm.sh/@zip.js/zip.js@2.7.44';
-import { verifyFirebaseToken } from '../ai-router/verify-firebase.ts';
+import { verifyFirebaseToken } from '../_shared/firebase-auth.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

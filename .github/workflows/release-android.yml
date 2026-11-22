@@ -157,15 +157,15 @@ jobs:
             echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing."
             exit 1
           fi
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d -i > android/app/corebridge-release.jks
-          echo "Keystore size: $(wc -c < android/app/corebridge-release.jks) bytes"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d -i > android/app/release.jks
+          echo "Keystore size: $(wc -c < android/app/release.jks) bytes"
 
       - name: Verify keystore
         env:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          keytool -list -keystore android/app/corebridge-release.jks \
+          keytool -list -keystore android/app/release.jks \
             -alias "$KEY_ALIAS" -storepass "$STORE_PASSWORD" | grep -E "Alias|fingerprint" || true
 
       - name: Debug secrets presence (no values printed)
@@ -184,9 +184,9 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           echo "Looking for alias '${KEY_ALIAS}' in the keystore..."
-          if ! keytool -list -keystore android/app/corebridge-release.jks -storepass "${STORE_PASSWORD}" | grep -qi "^${KEY_ALIAS},"; then
+          if ! keytool -list -keystore android/app/release.jks -storepass "${STORE_PASSWORD}" | grep -qi "^${KEY_ALIAS},"; then
             echo "::error::Alias '${KEY_ALIAS}' was NOT found in the keystore. Aliases present:"
-            keytool -list -keystore android/app/corebridge-release.jks -storepass "${STORE_PASSWORD}" | grep "PrivateKeyEntry\|,"
+            keytool -list -keystore android/app/release.jks -storepass "${STORE_PASSWORD}" | grep "PrivateKeyEntry\|,"
             exit 1
           fi
           echo "✅ Alias '${KEY_ALIAS}' found."
@@ -201,7 +201,7 @@ jobs:
           storePassword=$KEYSTORE_PASSWORD
           keyPassword=$KEY_PASSWORD
           keyAlias=$KEY_ALIAS
-          storeFile=corebridge-release.jks
+          storeFile=release.jks
           KEYPROPS
 
       - name: Restore google-services.json
@@ -252,9 +252,9 @@ jobs:
         run: |
           mkdir -p release_output
           cp build/app/outputs/flutter-apk/app-release.apk \
-             release_output/corebridge-ai-${{ steps.version.outputs.version_name }}.apk
+             release_output/aro-ai-${{ steps.version.outputs.version_name }}.apk
           cp build/app/outputs/bundle/release/app-release.aab \
-             release_output/corebridge-ai-${{ steps.version.outputs.version_name }}.aab
+             release_output/aro-ai-${{ steps.version.outputs.version_name }}.aab
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -277,7 +277,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version_name }}
-          name: CoreBridge AI v${{ steps.version.outputs.version_name }}
+          name: ARO AI v${{ steps.version.outputs.version_name }}
           generate_release_notes: true
           files: |
             apps/mobile/release_output/*.apk
@@ -286,6 +286,6 @@ jobs:
       - name: Clean up secrets from disk
         if: always()
         run: |
-          rm -f android/app/corebridge-release.jks
+          rm -f android/app/release.jks
           rm -f android/key.properties
           rm -f android/app/google-services.json

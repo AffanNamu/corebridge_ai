@@ -281,7 +281,7 @@ class _ChatComposerState extends State<ChatComposer> {
                               ? 'Listening…'
                               : (_attachedContent != null || _attachedImages.isNotEmpty)
                                   ? 'Add a message (optional)…'
-                                  : 'Message CoreBridge…',
+                                  : 'Message ARO…',
                           hintStyle: TextStyle(color: _isListening ? AppColors.accentBlue : AppColors.textMuted),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,

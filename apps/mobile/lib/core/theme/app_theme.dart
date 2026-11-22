@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Design tokens matching the CoreBridge app icon: deep near-black
+/// Design tokens matching the ARO AI app icon: deep near-black
 /// surfaces with an electric blue → violet gradient accent.
 class AppColors {
   AppColors._();

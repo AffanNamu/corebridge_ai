@@ -12,7 +12,7 @@
 
 # Flutter references Play Core's deferred-components/split-install APIs
 # even when the app doesn't use dynamic feature delivery. Since
-# CoreBridge doesn't use deferred components, tell R8 to ignore these
+# ARO AI doesn't use deferred components, tell R8 to ignore these
 # missing classes instead of failing the build.
 -dontwarn com.google.android.play.core.splitcompat.**
 -dontwarn com.google.android.play.core.splitinstall.**

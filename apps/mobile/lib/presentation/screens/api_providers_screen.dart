@@ -303,7 +303,7 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
                             Text('Your keys are safe and secure', style: Theme.of(context).textTheme.bodyLarge),
                             const SizedBox(height: 2),
                             Text(
-                              'Keys are stored in your private Firestore user profile and only ever leave your account to reach the provider you chose, via CoreBridge\'s Edge Function router.',
+                              'Keys are stored in your private Firestore user profile and only ever leave your account to reach the provider you chose, via ARO AI\'s Edge Function router.',
                               style: Theme.of(context).textTheme.labelSmall,
                             ),
                           ],
