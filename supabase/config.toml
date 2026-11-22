@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.file-process]
 verify_jwt = false
+
+[functions.aro-agent]
+verify_jwt = false
