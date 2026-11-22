@@ -1,0 +1,424 @@
+{
+  "_doc": "The seven ARO models — the complete product catalogue. Source of truth for training (training/aro_training/models.py), the Supabase seed (supabase/migrations) and docs/MODELS.md. Statuses here are defaults; admins change live status/limits in the admin dashboard.",
+  "shared_foundation": {
+    "base_model": "Qwen/Qwen3-4B",
+    "license": "apache-2.0",
+    "license_checked": "2026-11-22 (Hugging Face API license tag)",
+    "upgrade_path": "Qwen/Qwen3-8B (apache-2.0) once a 24 GB+ GPU serves production",
+    "why": "One base model serves ARO 1.5, Code, Research and Translate as LoRA adapters on a single vLLM server: one GPU, four specialists."
+  },
+  "models": [
+    {
+      "id": "aro-1.5",
+      "name": "ARO 1.5",
+      "tagline": "General intelligence",
+      "default_status": "live",
+      "chat_selectable": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "capabilities": [
+        "conversation & Q&A",
+        "writing, editing, summarization",
+        "general knowledge & explanations",
+        "everyday problem-solving",
+        "general reasoning",
+        "document understanding",
+        "planning & task assistance",
+        "basic math",
+        "research assistance",
+        "tool use & function calling"
+      ],
+      "architecture": {
+        "strategy": "shared-foundation-lora",
+        "base_model": "Qwen/Qwen3-4B",
+        "served_name": "aro-1.5",
+        "endpoint": "text"
+      },
+      "router_keywords": []
+    },
+    {
+      "id": "aro-code",
+      "name": "ARO Code",
+      "tagline": "Software engineering intelligence",
+      "default_status": "preview",
+      "chat_selectable": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "capabilities": [
+        "code generation",
+        "debugging & error resolution",
+        "code explanation",
+        "software architecture",
+        "application development",
+        "code review",
+        "database & API development",
+        "automated testing",
+        "programming languages",
+        "repository understanding (powers the Code tab agent)",
+        "technical documentation"
+      ],
+      "architecture": {
+        "strategy": "shared-foundation-lora",
+        "base_model": "Qwen/Qwen3-4B",
+        "served_name": "aro-code",
+        "endpoint": "text",
+        "alternatives_to_evaluate": [
+          {
+            "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+            "license": "apache-2.0",
+            "license_checked": "2026-11-22 (Hugging Face API license tag)"
+          }
+        ]
+      },
+      "router_keywords": [
+        "code",
+        "function",
+        "bug",
+        "error",
+        "exception",
+        "stack trace",
+        "compile",
+        "api",
+        "database",
+        "sql",
+        "regex",
+        "python",
+        "javascript",
+        "typescript",
+        "dart",
+        "flutter",
+        "java",
+        "kotlin",
+        "react",
+        "git",
+        "unit test",
+        "refactor"
+      ]
+    },
+    {
+      "id": "aro-research",
+      "name": "ARO Research",
+      "tagline": "Scientific & advanced reasoning",
+      "default_status": "preview",
+      "chat_selectable": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "capabilities": [
+        "advanced reasoning",
+        "mathematical problem-solving",
+        "scientific research",
+        "academic writing",
+        "research paper analysis",
+        "data interpretation",
+        "technical & engineering analysis",
+        "hypothesis development",
+        "evidence-based explanations",
+        "complex document analysis"
+      ],
+      "architecture": {
+        "strategy": "shared-foundation-lora",
+        "base_model": "Qwen/Qwen3-4B",
+        "served_name": "aro-research",
+        "endpoint": "text",
+        "thinking_default": true
+      },
+      "router_keywords": [
+        "prove",
+        "proof",
+        "theorem",
+        "equation",
+        "integral",
+        "derivative",
+        "calculate",
+        "probability",
+        "statistics",
+        "hypothesis",
+        "research",
+        "paper",
+        "thesis",
+        "experiment",
+        "physics",
+        "chemistry",
+        "biology",
+        "engineering analysis"
+      ]
+    },
+    {
+      "id": "aro-vision",
+      "name": "ARO Vision",
+      "tagline": "Visual intelligence",
+      "default_status": "planned",
+      "chat_selectable": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "capabilities": [
+        "image recognition & understanding",
+        "visual question answering",
+        "image analysis",
+        "OCR",
+        "document & screenshot understanding",
+        "object detection",
+        "visual reasoning",
+        "video understanding & scene analysis"
+      ],
+      "architecture": {
+        "strategy": "specialist",
+        "base_model": "Qwen/Qwen3-VL-4B-Instruct",
+        "base_license": "apache-2.0",
+        "license_checked": "2026-11-22 (Hugging Face API license tag)",
+        "served_name": "aro-vision",
+        "endpoint": "vision",
+        "upgrade_path": "Qwen/Qwen3-VL-8B-Instruct (apache-2.0)"
+      },
+      "router_keywords": []
+    },
+    {
+      "id": "aro-voice",
+      "name": "ARO Voice",
+      "tagline": "Speech & audio intelligence",
+      "default_status": "planned",
+      "chat_selectable": false,
+      "modalities": {
+        "input": [
+          "audio",
+          "text"
+        ],
+        "output": [
+          "text",
+          "audio"
+        ]
+      },
+      "capabilities": [
+        "speech-to-text",
+        "text-to-speech",
+        "voice conversations",
+        "speech recognition",
+        "audio transcription",
+        "speaker-independent understanding",
+        "audio classification",
+        "voice commands",
+        "spoken-language translation (with ARO Translate)",
+        "multilingual speech"
+      ],
+      "architecture": {
+        "strategy": "specialist",
+        "endpoint": "voice",
+        "components": [
+          {
+            "role": "speech-to-text",
+            "model": "openai/whisper-large-v3-turbo",
+            "license": "mit",
+            "license_checked": "2026-11-22 (Hugging Face API license tag)"
+          },
+          {
+            "role": "text-to-speech",
+            "model": "hexgrad/Kokoro-82M",
+            "license": "apache-2.0",
+            "license_checked": "2026-11-22 (Hugging Face API license tag)",
+            "gap": "no African-language voices yet"
+          }
+        ]
+      },
+      "router_keywords": []
+    },
+    {
+      "id": "aro-creative",
+      "name": "ARO Creative",
+      "tagline": "Generative media",
+      "default_status": "planned",
+      "chat_selectable": false,
+      "billing": "credits",
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "image",
+          "video",
+          "audio",
+          "text"
+        ]
+      },
+      "capabilities": [
+        "text-to-image",
+        "image editing & image-to-image",
+        "text-to-video & image-to-video",
+        "music & audio generation",
+        "creative writing, lyrics & storytelling (via ARO 1.5)",
+        "multimedia content creation"
+      ],
+      "architecture": {
+        "strategy": "specialist",
+        "endpoint": "creative",
+        "components": [
+          {
+            "role": "image",
+            "model": "black-forest-labs/FLUX.1-schnell",
+            "license": "apache-2.0",
+            "license_checked": "2026-11-22 (Hugging Face API license tag)",
+            "note": "gated: accept terms on Hugging Face"
+          },
+          {
+            "role": "video",
+            "model": "Wan-AI/Wan2.1-T2V-1.3B",
+            "license": "apache-2.0",
+            "license_checked": "2026-11-22 (Hugging Face API license tag)"
+          },
+          {
+            "role": "music",
+            "model": "ACE-Step/ACE-Step-v1-3.5B",
+            "license": "apache-2.0",
+            "license_checked": "2026-11-22 (Hugging Face API license tag)"
+          }
+        ]
+      },
+      "router_keywords": []
+    },
+    {
+      "id": "aro-translate",
+      "name": "ARO Translate",
+      "tagline": "Multilingual & African language intelligence",
+      "default_status": "preview",
+      "chat_selectable": true,
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "priority_languages": [
+        "en",
+        "ha",
+        "yo",
+        "ig",
+        "pcm",
+        "ff",
+        "ar",
+        "sw",
+        "am",
+        "wo",
+        "zu",
+        "xh"
+      ],
+      "capabilities": [
+        "text translation",
+        "multilingual conversation",
+        "language identification",
+        "contextual translation",
+        "African language understanding",
+        "speech translation (with ARO Voice)",
+        "grammar correction",
+        "multilingual summarization",
+        "language learning"
+      ],
+      "architecture": {
+        "strategy": "shared-foundation-lora",
+        "base_model": "Qwen/Qwen3-4B",
+        "served_name": "aro-translate",
+        "endpoint": "text",
+        "baseline_to_beat": {
+          "model": "google/madlad400-3b-mt",
+          "license": "apache-2.0",
+          "license_checked": "2026-11-22 (Hugging Face API license tag)"
+        }
+      },
+      "router_keywords": [
+        "translate",
+        "translation",
+        "in hausa",
+        "in yoruba",
+        "in igbo",
+        "in pidgin",
+        "in swahili",
+        "in arabic",
+        "in french",
+        "in amharic",
+        "in zulu",
+        "in xhosa",
+        "in wolof",
+        "in fulfulde",
+        "fassara"
+      ]
+    }
+  ],
+  "rejected_options": [
+    {
+      "model": "facebook/nllb-200-distilled-600M",
+      "license": "cc-by-nc-4.0",
+      "reason": "non-commercial — research comparison only, never in production"
+    },
+    {
+      "model": "facebook/mms-tts-hau",
+      "license": "cc-by-nc-4.0",
+      "reason": "non-commercial"
+    },
+    {
+      "model": "facebook/mms-1b-all",
+      "license": "cc-by-nc-4.0",
+      "reason": "non-commercial"
+    },
+    {
+      "model": "facebook/musicgen-small",
+      "license": "cc-by-nc-4.0",
+      "reason": "non-commercial"
+    },
+    {
+      "model": "black-forest-labs/FLUX.1-dev",
+      "license": "other (FLUX.1-dev non-commercial license)",
+      "reason": "non-commercial"
+    },
+    {
+      "model": "stabilityai/stable-audio-open-1.0",
+      "license": "other (Stability AI community license)",
+      "reason": "revenue-capped commercial terms — needs legal review"
+    },
+    {
+      "model": "Lightricks/LTX-Video",
+      "license": "other",
+      "reason": "custom license — needs legal review"
+    },
+    {
+      "model": "stabilityai/stable-diffusion-xl-base-1.0",
+      "license": "openrail++",
+      "reason": "commercial use allowed with use-based restrictions — kept as a fallback, not default"
+    },
+    {
+      "model": "Qwen/Qwen2.5-VL-3B-Instruct",
+      "license": "none on Hugging Face (Qwen research license)",
+      "reason": "not cleared for commercial use"
+    },
+    {
+      "model": "Qwen/Qwen2.5-3B",
+      "license": "qwen-research",
+      "reason": "research-only license"
+    }
+  ]
+}

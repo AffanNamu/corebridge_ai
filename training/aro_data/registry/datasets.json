@@ -1,0 +1,1988 @@
+{
+  "_doc": "ARO Data Engine registry. Every dataset ARO may touch is listed here. commercial_status: allowed | conditional | eval_only | rag_only | restricted | excluded | unverified. Only 'allowed' datasets with 'train' usage and a recorded license check may enter training data; 'eval' data never enters training; 'rag' sources are for retrieval at answer time.",
+  "datasets": [
+    {
+      "id": "fineweb",
+      "name": "FineWeb",
+      "publisher": "Hugging Face",
+      "source_url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb",
+      "hf_id": "HuggingFaceFW/fineweb",
+      "version": "9bb295ddab",
+      "download_method": "hf-datasets",
+      "size": "~15T tokens",
+      "format": "parquet",
+      "languages": [
+        "en"
+      ],
+      "license": "odc-by",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "pretrain"
+      ],
+      "redistribution": "ODC-By; underlying web pages keep their own copyright",
+      "attribution": "Cite FineWeb; ODC-By attribution",
+      "quality": "filtered CommonCrawl, high",
+      "models": [
+        "aro-1.5"
+      ],
+      "notes": "Only for continued pretraining (not planned yet). Web content rights and CommonCrawl terms apply."
+    },
+    {
+      "id": "dolma",
+      "name": "Dolma",
+      "publisher": "Allen Institute for AI",
+      "source_url": "https://huggingface.co/datasets/allenai/dolma",
+      "hf_id": "allenai/dolma",
+      "version": "7f48140530",
+      "download_method": "hf-datasets",
+      "size": "~3T tokens",
+      "format": "jsonl.gz",
+      "languages": [
+        "en"
+      ],
+      "license": "odc-by",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "pretrain"
+      ],
+      "redistribution": "ODC-By; mixed underlying sources",
+      "attribution": "Cite Dolma",
+      "quality": "high",
+      "models": [
+        "aro-1.5"
+      ],
+      "notes": "Pretraining corpus; underlying content rights vary by source."
+    },
+    {
+      "id": "oasst1",
+      "name": "OpenAssistant Conversations (oasst1)",
+      "publisher": "OpenAssistant / LAION",
+      "source_url": "https://huggingface.co/datasets/OpenAssistant/oasst1",
+      "hf_id": "OpenAssistant/oasst1",
+      "version": "fdf72ae082",
+      "download_method": "hf-datasets",
+      "size": "~88k messages",
+      "format": "parquet",
+      "languages": [
+        "en",
+        "es",
+        "fr",
+        "de",
+        "pt",
+        "ru",
+        "zh"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "Apache-2.0",
+      "attribution": "Apache-2.0 notice",
+      "quality": "human-written, human-ranked",
+      "models": [
+        "aro-1.5"
+      ],
+      "notes": "Superseded by oasst2 (which includes it)."
+    },
+    {
+      "id": "oasst2",
+      "name": "OpenAssistant Conversations (oasst2)",
+      "publisher": "OpenAssistant / LAION",
+      "source_url": "https://huggingface.co/datasets/OpenAssistant/oasst2",
+      "hf_id": "OpenAssistant/oasst2",
+      "version": "179dd21fc5",
+      "download_method": "hf-datasets",
+      "size": "~135k messages",
+      "format": "parquet",
+      "languages": [
+        "en",
+        "es",
+        "fr",
+        "de",
+        "pt",
+        "ru",
+        "zh",
+        "multi"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "Apache-2.0",
+      "attribution": "Apache-2.0 notice",
+      "quality": "human-written, human-ranked; synthetic rows filtered out",
+      "models": [
+        "aro-1.5",
+        "aro-code"
+      ],
+      "notes": "ARO 1.5 starter data (aro_training.bootstrap)."
+    },
+    {
+      "id": "aya",
+      "name": "Aya Dataset",
+      "publisher": "Cohere For AI",
+      "source_url": "https://huggingface.co/datasets/CohereLabs/aya_dataset",
+      "hf_id": "CohereLabs/aya_dataset",
+      "version": "f9ea04583f",
+      "download_method": "hf-datasets",
+      "size": "~204k prompt/completion pairs",
+      "format": "parquet",
+      "languages": [
+        "multi",
+        "ha",
+        "ig",
+        "yo",
+        "sw",
+        "am",
+        "wo",
+        "xh",
+        "zu",
+        "ar"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "Apache-2.0",
+      "attribution": "Cite Aya",
+      "quality": "human-written by native speakers",
+      "models": [
+        "aro-1.5",
+        "aro-translate"
+      ],
+      "notes": "Key source for African-language conversation."
+    },
+    {
+      "id": "tulu3-sft",
+      "name": "Tulu 3 SFT Mixture",
+      "publisher": "Allen Institute for AI",
+      "source_url": "https://huggingface.co/datasets/allenai/tulu-3-sft-mixture",
+      "hf_id": "allenai/tulu-3-sft-mixture",
+      "version": "b14afda60f",
+      "download_method": "hf-datasets",
+      "size": "~939k examples",
+      "format": "parquet",
+      "languages": [
+        "en"
+      ],
+      "license": "odc-by",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "restricted",
+      "usage": [],
+      "redistribution": "ODC-By overall; subsets carry their own licenses",
+      "attribution": "",
+      "quality": "high",
+      "models": [
+        "aro-1.5"
+      ],
+      "notes": "Mixture includes subsets generated by commercial models whose terms forbid training competing models. Only individually cleared subsets may be used — not the whole mixture."
+    },
+    {
+      "id": "ultrachat-200k",
+      "name": "UltraChat 200k",
+      "publisher": "Hugging Face H4",
+      "source_url": "https://huggingface.co/datasets/HuggingFaceH4/ultrachat_200k",
+      "hf_id": "HuggingFaceH4/ultrachat_200k",
+      "version": "8049631c40",
+      "download_method": "hf-datasets",
+      "size": "~200k dialogues",
+      "format": "parquet",
+      "languages": [
+        "en"
+      ],
+      "license": "mit",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "restricted",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "synthetic",
+      "models": [
+        "aro-1.5"
+      ],
+      "notes": "MIT tag, but the dialogues were generated with ChatGPT; OpenAI terms forbid using outputs to build competing models. Do not train on it."
+    },
+    {
+      "id": "no-robots",
+      "name": "No Robots",
+      "publisher": "Hugging Face H4",
+      "source_url": "https://huggingface.co/datasets/HuggingFaceH4/no_robots",
+      "hf_id": "HuggingFaceH4/no_robots",
+      "version": "e6f9a4ac5c",
+      "download_method": "hf-datasets",
+      "size": "10k examples",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc-by-nc-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "human-written, high",
+      "models": [
+        "aro-1.5"
+      ],
+      "notes": "Non-commercial license."
+    },
+    {
+      "id": "wikimedia-dumps",
+      "name": "Wikimedia Dumps (Wikipedia etc.)",
+      "publisher": "Wikimedia Foundation",
+      "source_url": "https://dumps.wikimedia.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "http",
+      "size": "~100 GB+ (all languages)",
+      "format": "xml/bz2",
+      "languages": [
+        "multi",
+        "ha",
+        "yo",
+        "ig",
+        "sw",
+        "am",
+        "ar",
+        "zu",
+        "xh",
+        "wo",
+        "pcm"
+      ],
+      "license": "cc-by-sa-4.0 / gfdl",
+      "license_checked": "manual: https://dumps.wikimedia.org/legal.html",
+      "commercial_status": "conditional",
+      "usage": [
+        "rag",
+        "pretrain"
+      ],
+      "redistribution": "share-alike",
+      "attribution": "Attribute Wikipedia contributors; share-alike for redistributed text",
+      "quality": "high, uneven across languages",
+      "models": [
+        "aro-1.5",
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Best as a RAG knowledge source with citations. Training use: legal review of share-alike obligations first."
+    },
+    {
+      "id": "the-stack",
+      "name": "The Stack",
+      "publisher": "BigCode",
+      "source_url": "https://huggingface.co/datasets/bigcode/the-stack",
+      "hf_id": "bigcode/the-stack",
+      "version": "153f6301d2",
+      "download_method": "hf-datasets",
+      "size": "~6 TB",
+      "format": "parquet",
+      "languages": [
+        "code"
+      ],
+      "license": "other (BigCode terms of use; per-file permissive licenses)",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review"
+      ],
+      "redistribution": "Terms of use; honour opt-out removals",
+      "attribution": "Keep per-file license/attribution metadata",
+      "quality": "raw code; needs filtering",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Gated. Requires accepting terms and keeping up with opt-out removals."
+    },
+    {
+      "id": "the-stack-v2",
+      "name": "The Stack v2",
+      "publisher": "BigCode / Software Heritage",
+      "source_url": "https://huggingface.co/datasets/bigcode/the-stack-v2",
+      "hf_id": "bigcode/the-stack-v2",
+      "version": "e565caa3a7",
+      "download_method": "hf-datasets",
+      "size": "~67 TB (ids; content via Software Heritage)",
+      "format": "",
+      "languages": [
+        "code"
+      ],
+      "license": "other (terms of use; Software Heritage)",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Gated; contents fetched from Software Heritage under their terms."
+    },
+    {
+      "id": "starcoderdata",
+      "name": "StarCoder Data",
+      "publisher": "BigCode",
+      "source_url": "https://huggingface.co/datasets/bigcode/starcoderdata",
+      "hf_id": "bigcode/starcoderdata",
+      "version": "9fc30b578c",
+      "download_method": "hf-datasets",
+      "size": "~783 GB",
+      "format": "",
+      "languages": [
+        "code"
+      ],
+      "license": "other (BigCode terms of use)",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Gated; same conditions as The Stack."
+    },
+    {
+      "id": "codesearchnet",
+      "name": "CodeSearchNet",
+      "publisher": "GitHub",
+      "source_url": "https://huggingface.co/datasets/CodeSearchNet/code_search_net",
+      "hf_id": "CodeSearchNet/code_search_net",
+      "version": "pin at download (Hugging Face revision sha)",
+      "download_method": "hf-datasets",
+      "size": "~2M functions",
+      "format": "",
+      "languages": [
+        "code"
+      ],
+      "license": "unverified",
+      "license_checked": "hf-api 2026-11-22: 401 (not accessible)",
+      "commercial_status": "unverified",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Could not read the dataset card; verify license before any use."
+    },
+    {
+      "id": "commitpack",
+      "name": "CommitPack",
+      "publisher": "BigCode",
+      "source_url": "https://huggingface.co/datasets/bigcode/commitpack",
+      "hf_id": "bigcode/commitpack",
+      "version": "5eee2c845b",
+      "download_method": "hf-datasets",
+      "size": "~4 TB",
+      "format": "",
+      "languages": [
+        "code",
+        "en"
+      ],
+      "license": "mit (dataset) + per-repo permissive licenses",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review"
+      ],
+      "redistribution": "",
+      "attribution": "Keep repo license metadata",
+      "quality": "real commits; noisy",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Good for 'fix this code' style data (CommitPackFT subset)."
+    },
+    {
+      "id": "code-contests",
+      "name": "CodeContests",
+      "publisher": "Google DeepMind",
+      "source_url": "https://huggingface.co/datasets/deepmind/code_contests",
+      "hf_id": "deepmind/code_contests",
+      "version": "802411c301",
+      "download_method": "hf-datasets",
+      "size": "~13k problems",
+      "format": "parquet",
+      "languages": [
+        "en",
+        "code"
+      ],
+      "license": "cc-by-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "Cite AlphaCode / CodeContests (CC-BY-4.0)",
+      "quality": "competitive programming, correct human solutions",
+      "models": [
+        "aro-code",
+        "aro-research"
+      ],
+      "notes": "Train split for ARO Code; test split kept for evaluation only.",
+      "splits": {
+        "train": "train",
+        "eval": "test"
+      }
+    },
+    {
+      "id": "mbpp",
+      "name": "MBPP",
+      "publisher": "Google Research",
+      "source_url": "https://huggingface.co/datasets/google-research-datasets/mbpp",
+      "hf_id": "google-research-datasets/mbpp",
+      "version": "4bb6404fdc",
+      "download_method": "hf-datasets",
+      "size": "974 problems",
+      "format": "",
+      "languages": [
+        "en",
+        "code"
+      ],
+      "license": "cc-by-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Benchmark — never train on it (contamination)."
+    },
+    {
+      "id": "humaneval",
+      "name": "HumanEval",
+      "publisher": "OpenAI",
+      "source_url": "https://github.com/openai/human-eval",
+      "hf_id": "openai/openai_humaneval",
+      "version": "7dce6050a7",
+      "download_method": "hf-datasets",
+      "size": "164 problems",
+      "format": "",
+      "languages": [
+        "en",
+        "code"
+      ],
+      "license": "mit",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Benchmark — evaluation only."
+    },
+    {
+      "id": "swe-bench",
+      "name": "SWE-bench",
+      "publisher": "Princeton NLP",
+      "source_url": "https://www.swebench.com/",
+      "hf_id": "princeton-nlp/SWE-bench",
+      "version": "e48e2bd1e9",
+      "download_method": "hf-datasets",
+      "size": "2,294 tasks",
+      "format": "",
+      "languages": [
+        "en",
+        "code"
+      ],
+      "license": "mit (per GitHub repo)",
+      "license_checked": "hf-api 2026-11-22: no license tag; MIT on github.com/SWE-bench/SWE-bench",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-code"
+      ],
+      "notes": "Measures the GitHub agent (aro-agent). Evaluation only."
+    },
+    {
+      "id": "gsm8k",
+      "name": "GSM8K",
+      "publisher": "OpenAI",
+      "source_url": "https://huggingface.co/datasets/openai/gsm8k",
+      "hf_id": "openai/gsm8k",
+      "version": "740312add8",
+      "download_method": "hf-datasets",
+      "size": "8.8k problems",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "mit",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "MIT notice",
+      "quality": "human-written step-by-step solutions",
+      "models": [
+        "aro-research",
+        "aro-1.5"
+      ],
+      "notes": "Train split for ARO Research; test split for evaluation only.",
+      "splits": {
+        "train": "train",
+        "eval": "test"
+      }
+    },
+    {
+      "id": "competition-math",
+      "name": "MATH (competition_math)",
+      "publisher": "Hendrycks et al.",
+      "source_url": "https://huggingface.co/datasets/hendrycks/competition_math",
+      "hf_id": "hendrycks/competition_math",
+      "version": "71b758ecc6",
+      "download_method": "hf-datasets",
+      "size": "12.5k problems",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "mit (tag) — dataset disabled",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "Disabled on Hugging Face after a takedown notice. Do not use copies."
+    },
+    {
+      "id": "numinamath-cot",
+      "name": "NuminaMath-CoT",
+      "publisher": "Project Numina",
+      "source_url": "https://huggingface.co/datasets/AI-MO/NuminaMath-CoT",
+      "hf_id": "AI-MO/NuminaMath-CoT",
+      "version": "9d8d210c9f",
+      "download_method": "hf-datasets",
+      "size": "~860k problems",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "restricted",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "high",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "Apache tag, but solutions were rewritten by a commercial model whose terms restrict training competing models. Needs legal review."
+    },
+    {
+      "id": "open-web-math",
+      "name": "OpenWebMath",
+      "publisher": "open-web-math",
+      "source_url": "https://huggingface.co/datasets/open-web-math/open-web-math",
+      "hf_id": "open-web-math/open-web-math",
+      "version": "fde8ef8de2",
+      "download_method": "hf-datasets",
+      "size": "~14.7B tokens",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "unspecified on hub (web content)",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "pretrain"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "No license tag on the hub; underlying web pages keep their copyright."
+    },
+    {
+      "id": "ai2-arc",
+      "name": "ARC (AI2 Reasoning Challenge)",
+      "publisher": "Allen Institute for AI",
+      "source_url": "https://huggingface.co/datasets/allenai/ai2_arc",
+      "hf_id": "allenai/ai2_arc",
+      "version": "210d026faf",
+      "download_method": "hf-datasets",
+      "size": "7.8k questions",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc-by-sa-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "Benchmark; share-alike — evaluation only."
+    },
+    {
+      "id": "big-bench",
+      "name": "BIG-bench",
+      "publisher": "Google",
+      "source_url": "https://github.com/google/BIG-bench",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "git",
+      "size": "200+ tasks",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "manual: repository LICENSE",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research",
+        "aro-1.5"
+      ],
+      "notes": "Contains a canary string; evaluation only."
+    },
+    {
+      "id": "afrimgsm",
+      "name": "AfriMGSM",
+      "publisher": "Masakhane",
+      "source_url": "https://huggingface.co/datasets/masakhane/afrimgsm",
+      "hf_id": "masakhane/afrimgsm",
+      "version": "8e4268d2b9",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "am",
+        "ha",
+        "ig",
+        "sw",
+        "wo",
+        "xh",
+        "yo",
+        "zu",
+        "en"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Math reasoning in African languages — evaluation."
+    },
+    {
+      "id": "arxiv",
+      "name": "arXiv",
+      "publisher": "Cornell University",
+      "source_url": "https://arxiv.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "api",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "per-paper (often arXiv non-exclusive license); metadata CC0",
+      "license_checked": "manual: https://info.arxiv.org/help/license",
+      "commercial_status": "rag_only",
+      "usage": [
+        "rag"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "Search and cite at answer time (RAG). Only CC-BY papers could ever be trained on."
+    },
+    {
+      "id": "openalex",
+      "name": "OpenAlex",
+      "publisher": "OurResearch",
+      "source_url": "https://openalex.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "api",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc0-1.0",
+      "license_checked": "manual: https://openalex.org/about",
+      "commercial_status": "rag_only",
+      "usage": [
+        "rag"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "Scholarly metadata for research lookup."
+    },
+    {
+      "id": "semantic-scholar",
+      "name": "Semantic Scholar",
+      "publisher": "Allen Institute for AI",
+      "source_url": "https://www.semanticscholar.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "api",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "API license agreement",
+      "license_checked": "manual: https://www.semanticscholar.org/product/api/license",
+      "commercial_status": "rag_only",
+      "usage": [
+        "rag"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "API terms apply; attribution required."
+    },
+    {
+      "id": "pubmed",
+      "name": "PubMed / PMC Open Access",
+      "publisher": "US National Library of Medicine",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "api",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "abstracts: publisher copyright; PMC OA subset: per-article CC licenses",
+      "license_checked": "manual: https://www.ncbi.nlm.nih.gov/pmc/tools/openftlist/",
+      "commercial_status": "rag_only",
+      "usage": [
+        "rag"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "RAG with citations; medical answers need extra safety review."
+    },
+    {
+      "id": "uci-ml",
+      "name": "UCI Machine Learning Repository",
+      "publisher": "UC Irvine",
+      "source_url": "https://archive.ics.uci.edu/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "http",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "per dataset (many CC-BY-4.0)",
+      "license_checked": null,
+      "commercial_status": "conditional",
+      "usage": [
+        "rag",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-research"
+      ],
+      "notes": "Check each dataset's license individually."
+    },
+    {
+      "id": "coco",
+      "name": "COCO",
+      "publisher": "COCO Consortium",
+      "source_url": "https://cocodataset.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "http",
+      "size": "330k images",
+      "format": "jpg + json",
+      "languages": [
+        "en"
+      ],
+      "license": "annotations cc-by-4.0; images: Flickr terms per image",
+      "license_checked": "manual: https://cocodataset.org/#termsofuse",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-vision"
+      ],
+      "notes": "Annotations are fine; images keep Flickr owners' rights."
+    },
+    {
+      "id": "open-images",
+      "name": "Open Images V7",
+      "publisher": "Google",
+      "source_url": "https://storage.googleapis.com/openimages/web/index.html",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "http",
+      "size": "~9M images",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "annotations cc-by-4.0; images listed as cc-by-2.0",
+      "license_checked": "manual: Open Images license section",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "Per-image attribution",
+      "quality": "",
+      "models": [
+        "aro-vision"
+      ],
+      "notes": "Google does not guarantee image licenses; keep per-image attribution."
+    },
+    {
+      "id": "visual-genome",
+      "name": "Visual Genome",
+      "publisher": "Stanford",
+      "source_url": "https://visualgenome.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "http",
+      "size": "108k images",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc-by-4.0 (annotations)",
+      "license_checked": "manual: visualgenome.org",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-vision"
+      ],
+      "notes": "Images come from COCO/Flickr with their own rights."
+    },
+    {
+      "id": "imagenet",
+      "name": "ImageNet",
+      "publisher": "Stanford / Princeton",
+      "source_url": "https://www.image-net.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "non-commercial research terms",
+      "license_checked": "manual: image-net.org download terms",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-vision"
+      ],
+      "notes": "Non-commercial terms of access."
+    },
+    {
+      "id": "wikimedia-commons",
+      "name": "Wikimedia Commons",
+      "publisher": "Wikimedia Foundation",
+      "source_url": "https://commons.wikimedia.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "api",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "per file (CC0, CC-BY, CC-BY-SA, public domain…)",
+      "license_checked": "manual: commons licensing policy",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review",
+        "rag"
+      ],
+      "redistribution": "",
+      "attribution": "Per-file attribution and license",
+      "quality": "",
+      "models": [
+        "aro-vision",
+        "aro-creative"
+      ],
+      "notes": "Filter to CC0/CC-BY/public-domain files only and keep attribution."
+    },
+    {
+      "id": "ego4d",
+      "name": "Ego4D",
+      "publisher": "Ego4D Consortium",
+      "source_url": "https://ego4d-data.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "Ego4D license agreement",
+      "license_checked": "manual: ego4d-data.org license",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-vision"
+      ],
+      "notes": "Access requires a license agreement for research use."
+    },
+    {
+      "id": "activitynet",
+      "name": "ActivityNet",
+      "publisher": "ActivityNet",
+      "source_url": "http://activity-net.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "annotations only; videos are YouTube content",
+      "license_checked": "manual",
+      "commercial_status": "restricted",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-vision",
+        "aro-creative"
+      ],
+      "notes": "Videos are third-party YouTube content."
+    },
+    {
+      "id": "common-voice",
+      "name": "Mozilla Common Voice",
+      "publisher": "Mozilla Foundation",
+      "source_url": "https://commonvoice.mozilla.org/en/datasets",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "30k+ hours",
+      "format": "",
+      "languages": [
+        "multi",
+        "ha",
+        "yo",
+        "ig",
+        "sw",
+        "am",
+        "ar",
+        "zu",
+        "xh",
+        "wo"
+      ],
+      "license": "cc0-1.0",
+      "license_checked": "manual: commonvoice.mozilla.org datasets page (CC0); HF mirror has no license tag",
+      "commercial_status": "allowed",
+      "usage": [
+        "train",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "crowd-sourced; varied quality per language",
+      "models": [
+        "aro-voice",
+        "aro-translate"
+      ],
+      "notes": "Download from Mozilla's site; do not try to identify speakers.",
+      "splits": {
+        "train": "train",
+        "eval": "test"
+      }
+    },
+    {
+      "id": "librispeech",
+      "name": "LibriSpeech",
+      "publisher": "OpenSLR",
+      "source_url": "https://www.openslr.org/12",
+      "hf_id": "openslr/librispeech_asr",
+      "version": "71cacbfb7e",
+      "download_method": "hf-datasets",
+      "size": "~1,000 hours",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc-by-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "Cite LibriSpeech",
+      "quality": "",
+      "models": [
+        "aro-voice"
+      ],
+      "notes": "",
+      "splits": {
+        "train": "train.clean.100",
+        "eval": "test.clean"
+      }
+    },
+    {
+      "id": "libritts",
+      "name": "LibriTTS",
+      "publisher": "OpenSLR",
+      "source_url": "https://www.openslr.org/60",
+      "hf_id": "mythicinfinity/libritts",
+      "version": "35f26bdafa",
+      "download_method": "hf-datasets",
+      "size": "~585 hours",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc-by-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "",
+      "attribution": "Cite LibriTTS",
+      "quality": "",
+      "models": [
+        "aro-voice"
+      ],
+      "notes": "TTS training."
+    },
+    {
+      "id": "fleurs",
+      "name": "FLEURS",
+      "publisher": "Google",
+      "source_url": "https://huggingface.co/datasets/google/fleurs",
+      "hf_id": "google/fleurs",
+      "version": "70bb2e84b9",
+      "download_method": "hf-datasets",
+      "size": "~12 hours per language",
+      "format": "",
+      "languages": [
+        "multi",
+        "ha",
+        "yo",
+        "ig",
+        "sw",
+        "am",
+        "ar",
+        "zu",
+        "xh",
+        "wo",
+        "ff"
+      ],
+      "license": "cc-by-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "Cite FLEURS",
+      "quality": "",
+      "models": [
+        "aro-voice",
+        "aro-translate"
+      ],
+      "notes": "",
+      "splits": {
+        "train": "train",
+        "eval": "test"
+      }
+    },
+    {
+      "id": "waxal",
+      "name": "WAXAL",
+      "publisher": "Google",
+      "source_url": "https://huggingface.co/datasets/google/WAXAL",
+      "hf_id": "google/WAXAL",
+      "version": "pin at download (Hugging Face revision sha)",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "unverified",
+      "license_checked": "hf-api 2026-11-22: 401 (gated or private)",
+      "commercial_status": "unverified",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-voice",
+        "aro-translate"
+      ],
+      "notes": "Request access and read the license before use."
+    },
+    {
+      "id": "gigaspeech",
+      "name": "GigaSpeech",
+      "publisher": "SpeechColab",
+      "source_url": "https://github.com/SpeechColab/GigaSpeech",
+      "hf_id": "speechcolab/gigaspeech",
+      "version": "63c0836b64",
+      "download_method": "hf-datasets",
+      "size": "10,000 hours",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "apache-2.0 tag; access via terms of use",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-voice"
+      ],
+      "notes": "Gated; audio comes from podcasts/YouTube — read the access terms."
+    },
+    {
+      "id": "musan",
+      "name": "MUSAN",
+      "publisher": "OpenSLR",
+      "source_url": "https://www.openslr.org/17",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "http",
+      "size": "~11 GB",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "mixed (mostly cc-by-4.0 / public domain)",
+      "license_checked": "manual: openslr.org/17 LICENSE",
+      "commercial_status": "conditional",
+      "usage": [
+        "augment"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-voice"
+      ],
+      "notes": "Noise/music for augmentation; per-file licenses."
+    },
+    {
+      "id": "voxpopuli",
+      "name": "VoxPopuli",
+      "publisher": "Meta AI",
+      "source_url": "https://github.com/facebookresearch/voxpopuli",
+      "hf_id": "facebook/voxpopuli",
+      "version": "42f01879c7",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "multi"
+      ],
+      "license": "cc0-1.0 (transcribed) + other (raw)",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-voice"
+      ],
+      "notes": "European Parliament data; check the raw audio terms."
+    },
+    {
+      "id": "audioset",
+      "name": "AudioSet",
+      "publisher": "Google",
+      "source_url": "https://research.google.com/audioset/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "annotations cc-by-4.0; audio is YouTube content",
+      "license_checked": "manual",
+      "commercial_status": "restricted",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-voice"
+      ],
+      "notes": "Audio itself is not distributed."
+    },
+    {
+      "id": "laion",
+      "name": "LAION-5B / Re-LAION",
+      "publisher": "LAION",
+      "source_url": "https://laion.ai/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "cc-by-4.0 (metadata); images: third-party copyright",
+      "license_checked": "manual",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-creative"
+      ],
+      "notes": "Links to copyrighted web images; the original release was withdrawn in 2023 for safety reasons. Do not use."
+    },
+    {
+      "id": "conceptual-captions",
+      "name": "Conceptual Captions",
+      "publisher": "Google",
+      "source_url": "https://ai.google.com/research/ConceptualCaptions/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "dataset terms allow use; images: third-party copyright",
+      "license_checked": "manual",
+      "commercial_status": "restricted",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-creative",
+        "aro-vision"
+      ],
+      "notes": "Image URLs point to copyrighted content."
+    },
+    {
+      "id": "webvid",
+      "name": "WebVid",
+      "publisher": "Bain et al.",
+      "source_url": "https://m-bain.github.io/webvid/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "withdrawn",
+      "license_checked": "manual",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-creative"
+      ],
+      "notes": "Taken down after a takedown request from the stock-footage owner."
+    },
+    {
+      "id": "youcook2",
+      "name": "YouCook2",
+      "publisher": "University of Michigan",
+      "source_url": "https://youcook2.github.io/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "annotations research; videos YouTube",
+      "license_checked": "manual",
+      "commercial_status": "restricted",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-creative",
+        "aro-vision"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "open-x-embodiment",
+      "name": "Open X-Embodiment",
+      "publisher": "Google DeepMind & partners",
+      "source_url": "https://robotics-transformer-x.github.io/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "per sub-dataset",
+      "license_checked": "manual",
+      "commercial_status": "conditional",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [],
+      "notes": "Robotics data — no ARO model uses it today."
+    },
+    {
+      "id": "smol",
+      "name": "SMOL (low-resource translation)",
+      "publisher": "Google",
+      "source_url": "https://huggingface.co/datasets/google/smol",
+      "hf_id": "google/smol",
+      "version": "fdaff3a1a0",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en",
+        "ha",
+        "yo",
+        "ig",
+        "pcm",
+        "ff",
+        "sw",
+        "am",
+        "wo",
+        "zu",
+        "xh",
+        "ar"
+      ],
+      "license": "cc-by-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "",
+      "attribution": "Cite SMOL (CC-BY-4.0)",
+      "quality": "professional translations",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Main ARO Translate training source for African languages."
+    },
+    {
+      "id": "afriberta-corpus",
+      "name": "AfriBERTa Corpus",
+      "publisher": "Castorini (University of Waterloo)",
+      "source_url": "https://huggingface.co/datasets/castorini/afriberta-corpus",
+      "hf_id": "castorini/afriberta-corpus",
+      "version": "d83da9653e",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "ha",
+        "yo",
+        "ig",
+        "pcm",
+        "sw",
+        "am",
+        "so",
+        "om",
+        "ti",
+        "rw",
+        "rn"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "pretrain",
+        "train"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "monolingual news/web text",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Monolingual text — language identification and fluency."
+    },
+    {
+      "id": "masakhaner2",
+      "name": "MasakhaNER 2.0",
+      "publisher": "Masakhane",
+      "source_url": "https://huggingface.co/datasets/masakhane/masakhaner2",
+      "hf_id": "masakhane/masakhaner2",
+      "version": "60512e89e6",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "ha",
+        "ig",
+        "pcm",
+        "sw",
+        "wo",
+        "xh",
+        "yo",
+        "zu"
+      ],
+      "license": "afl-3.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "allowed",
+      "usage": [
+        "train",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "Academic Free License 3.0 notice",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Named entities in African languages.",
+      "splits": {
+        "train": "train",
+        "eval": "test"
+      }
+    },
+    {
+      "id": "afrixnli",
+      "name": "AfriXNLI",
+      "publisher": "Masakhane",
+      "source_url": "https://huggingface.co/datasets/masakhane/afrixnli",
+      "hf_id": "masakhane/afrixnli",
+      "version": "e3ca06b30f",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "am",
+        "ig",
+        "wo",
+        "xh",
+        "zu",
+        "yo",
+        "ha",
+        "sw"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Understanding benchmark — evaluation only."
+    },
+    {
+      "id": "flores-plus",
+      "name": "FLORES+",
+      "publisher": "Open Language Data Initiative",
+      "source_url": "https://huggingface.co/datasets/openlanguagedata/flores_plus",
+      "hf_id": "openlanguagedata/flores_plus",
+      "version": "286d1e920e",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "multi",
+        "ha",
+        "yo",
+        "ig",
+        "am",
+        "ar",
+        "wo",
+        "zu",
+        "xh"
+      ],
+      "license": "cc-by-sa-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Standard translation benchmark — evaluation only."
+    },
+    {
+      "id": "belebele",
+      "name": "Belebele",
+      "publisher": "Meta AI",
+      "source_url": "https://huggingface.co/datasets/facebook/belebele",
+      "hf_id": "facebook/belebele",
+      "version": "7899cdfa4e",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "multi",
+        "ha",
+        "yo",
+        "ig",
+        "sw",
+        "am",
+        "ar",
+        "wo",
+        "zu",
+        "xh",
+        "ff"
+      ],
+      "license": "cc-by-sa-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate",
+        "aro-1.5"
+      ],
+      "notes": "Reading comprehension in 120+ languages — evaluation only."
+    },
+    {
+      "id": "wmt24pp",
+      "name": "WMT24++",
+      "publisher": "Google",
+      "source_url": "https://huggingface.co/datasets/google/wmt24pp",
+      "hf_id": "google/wmt24pp",
+      "version": "fd7405c064",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "ar",
+        "sw",
+        "zu",
+        "multi"
+      ],
+      "license": "apache-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Kept for evaluation to stay comparable with published results."
+    },
+    {
+      "id": "mafand",
+      "name": "MAFAND-MT",
+      "publisher": "Masakhane",
+      "source_url": "https://huggingface.co/datasets/masakhane/mafand",
+      "hf_id": "masakhane/mafand",
+      "version": "b215cd3c70",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "ha",
+        "yo",
+        "ig",
+        "pcm",
+        "sw",
+        "am",
+        "wo",
+        "zu",
+        "xh"
+      ],
+      "license": "cc-by-nc-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Non-commercial license."
+    },
+    {
+      "id": "tatoeba-mt",
+      "name": "Tatoeba MT",
+      "publisher": "Helsinki-NLP",
+      "source_url": "https://huggingface.co/datasets/Helsinki-NLP/tatoeba_mt",
+      "hf_id": "Helsinki-NLP/tatoeba_mt",
+      "version": "f337793bd1",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "hau",
+        "xho",
+        "multi"
+      ],
+      "license": "cc-by-2.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review",
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "Per-sentence Tatoeba attribution",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Gated; small for African languages."
+    },
+    {
+      "id": "opus-100",
+      "name": "OPUS-100",
+      "publisher": "Helsinki-NLP",
+      "source_url": "https://huggingface.co/datasets/Helsinki-NLP/opus-100",
+      "hf_id": "Helsinki-NLP/opus-100",
+      "version": "805090dc28",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "am",
+        "ar",
+        "ha",
+        "ig",
+        "xh",
+        "yo",
+        "zu"
+      ],
+      "license": "unknown",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "unverified",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Mix of OPUS corpora with different licenses; license tag 'unknown'."
+    },
+    {
+      "id": "afrolm",
+      "name": "AfroLM corpus",
+      "publisher": "Bonaventure Dossou et al.",
+      "source_url": "https://github.com/bonaventuredossou/afroLM",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "git",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "unverified",
+      "license_checked": "hf-api 2026-11-22: Davlan/afrolm_dataset 401",
+      "commercial_status": "unverified",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Read the repository license and data sources before use."
+    },
+    {
+      "id": "african-storybook",
+      "name": "African Storybook",
+      "publisher": "Saide",
+      "source_url": "https://www.africanstorybook.org/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "manual",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "multi",
+        "ha",
+        "yo",
+        "ig",
+        "sw",
+        "zu",
+        "xh",
+        "am"
+      ],
+      "license": "mostly cc-by-4.0; some stories cc-by-nc",
+      "license_checked": "manual",
+      "commercial_status": "conditional",
+      "usage": [
+        "train-after-review",
+        "rag"
+      ],
+      "redistribution": "",
+      "attribution": "Per-story attribution",
+      "quality": "",
+      "models": [
+        "aro-translate"
+      ],
+      "notes": "Filter to CC-BY stories only."
+    },
+    {
+      "id": "hausavg",
+      "name": "HausaVG",
+      "publisher": "HausaNLP",
+      "source_url": "https://huggingface.co/datasets/HausaNLP/HausaVG",
+      "hf_id": "HausaNLP/HausaVG",
+      "version": "0869b83569",
+      "download_method": "hf-datasets",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "ha"
+      ],
+      "license": "cc-by-nc-sa-4.0",
+      "license_checked": "hf-api 2026-11-22",
+      "commercial_status": "excluded",
+      "usage": [],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-translate",
+        "aro-vision"
+      ],
+      "notes": "Non-commercial license."
+    },
+    {
+      "id": "aro-identity",
+      "name": "ARO identity seed",
+      "publisher": "ARO AI",
+      "source_url": "training/seed/identity.jsonl",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "repo",
+      "size": "16 examples",
+      "format": "",
+      "languages": [
+        "en",
+        "ha",
+        "fr"
+      ],
+      "license": "proprietary (ARO AI)",
+      "license_checked": "owned by ARO AI",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "hand-written",
+      "models": [
+        "aro-1.5",
+        "aro-code",
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Teaches every text model that it is an ARO model."
+    },
+    {
+      "id": "aro-user-feedback",
+      "name": "ARO user feedback",
+      "publisher": "ARO AI users (opt-in)",
+      "source_url": "firestore: conversations/*/items",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "firestore-export",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "multi"
+      ],
+      "license": "user content, used under opt-in consent",
+      "license_checked": "consent: users/{uid}.trainingConsent",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "never redistributed",
+      "attribution": "",
+      "quality": "rated by users; scrubbed of personal data",
+      "models": [
+        "aro-1.5",
+        "aro-code",
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Only ARO-served, rated answers and corrections (aro_training.export)."
+    },
+    {
+      "id": "aro-eval",
+      "name": "ARO evaluation sets",
+      "publisher": "ARO AI",
+      "source_url": "training/eval/",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "repo",
+      "size": "see source",
+      "format": "",
+      "languages": [
+        "en"
+      ],
+      "license": "proprietary (ARO AI)",
+      "license_checked": "owned by ARO AI",
+      "commercial_status": "eval_only",
+      "usage": [
+        "eval"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "",
+      "models": [
+        "aro-1.5",
+        "aro-code",
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Fixed test sets used to accept or reject new versions."
+    }
+  ]
+}

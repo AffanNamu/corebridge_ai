@@ -21,7 +21,7 @@ train = ["unsloth", "trl>=0.12", "peft>=0.12", "transformers>=4.51", "accelerate
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
-include = ["aro_training*"]
+include = ["aro_training*", "aro_data*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
