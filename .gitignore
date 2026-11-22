@@ -60,3 +60,5 @@ training/data/*.jsonl
 *.safetensors
 *.gguf
 service-account*.json
+firestore/node_modules/
+firestore-debug.log

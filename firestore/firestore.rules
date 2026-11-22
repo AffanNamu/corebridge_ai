@@ -1,0 +1,88 @@
+rules_version = '2';
+
+// ARO AI — Firestore security rules.
+//
+// Every document belongs to exactly one user. Clients can only read and
+// write their own data; nobody can list or read another user's API keys,
+// GitHub token, chats or agent sessions. The training export runs with the
+// Admin SDK (service account), which bypasses these rules.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // For top-level collections whose documents carry an `ownerId` field.
+    function ownsExisting() {
+      return isUser(resource.data.ownerId);
+    }
+
+    function ownsIncoming() {
+      return isUser(request.resource.data.ownerId);
+    }
+
+    function ownerUnchanged() {
+      return request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    function ownsParent(collectionName, parentId) {
+      return isUser(get(/databases/$(database)/documents/$(collectionName)/$(parentId)).data.ownerId);
+    }
+
+    // Profile, settings, API keys and GitHub token. Owner only.
+    match /users/{uid} {
+      allow read, write: if isUser(uid);
+    }
+
+    match /conversations/{conversationId} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting() && ownerUnchanged();
+
+      // Messages (`items`), including 👍/👎 ratings and corrections.
+      match /items/{itemId} {
+        allow read, write: if ownsParent('conversations', conversationId);
+      }
+    }
+
+    match /artifacts/{artifactId} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting() && ownerUnchanged();
+
+      match /versions/{versionId} {
+        allow read, write: if ownsParent('artifacts', artifactId);
+      }
+    }
+
+    match /files/{fileId} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting() && ownerUnchanged();
+    }
+
+    match /projects/{projectId} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting() && ownerUnchanged();
+    }
+
+    // GitHub coding-agent sessions.
+    match /agentSessions/{sessionId} {
+      allow read, delete: if ownsExisting();
+      allow create: if ownsIncoming();
+      allow update: if ownsExisting() && ownerUnchanged();
+    }
+
+    // Anything not listed above is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
