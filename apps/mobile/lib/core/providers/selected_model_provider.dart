@@ -5,17 +5,31 @@ class AiModelOption {
   final String label;
   final bool supportsThinking;
   final bool supportsVision;
+
+  /// For provider 'aro': which ARO model ('auto' lets the server's router
+  /// pick the specialist). Null for the bring-your-own-key providers.
+  final String? aroModel;
+
   const AiModelOption({
     required this.provider,
     required this.label,
     this.supportsThinking = false,
     this.supportsVision = false,
+    this.aroModel,
   });
+
+  bool get isAro => provider == 'aro';
 }
 
-final availableModels = <AiModelOption>[
-  // ARO 1.5 is ARO AI's own model — first, so it's the default for new users.
-  AiModelOption(provider: 'aro', label: 'ARO 1.5', supportsThinking: true, supportsVision: false),
+final availableModels = const <AiModelOption>[
+  // ARO AI's own models. "ARO (Auto)" is first, so new users get the central
+  // router: it sends each request to the right ARO specialist.
+  AiModelOption(provider: 'aro', label: 'ARO (Auto)', aroModel: 'auto', supportsThinking: true, supportsVision: true),
+  AiModelOption(provider: 'aro', label: 'ARO 1.5', aroModel: 'aro-1.5', supportsThinking: true),
+  AiModelOption(provider: 'aro', label: 'ARO Code', aroModel: 'aro-code', supportsThinking: true),
+  AiModelOption(provider: 'aro', label: 'ARO Research', aroModel: 'aro-research', supportsThinking: true),
+  AiModelOption(provider: 'aro', label: 'ARO Translate', aroModel: 'aro-translate'),
+  AiModelOption(provider: 'aro', label: 'ARO Vision', aroModel: 'aro-vision', supportsVision: true),
   AiModelOption(provider: 'claude', label: 'Claude', supportsThinking: true, supportsVision: true),
   AiModelOption(provider: 'openai', label: 'ChatGPT', supportsThinking: false, supportsVision: true),
   AiModelOption(provider: 'gemini', label: 'Gemini', supportsThinking: true, supportsVision: true),

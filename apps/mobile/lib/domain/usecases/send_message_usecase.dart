@@ -18,12 +18,14 @@ class SendMessageUseCase {
     required String userMessage,
     required List<MessageEntity> history,
     required String provider,
+    // For provider 'aro': which ARO model ('auto', 'aro-code', ...).
+    String? aroModel,
     List<ChatAttachment> attachments = const [],
     bool thinkingEnabled = false,
     CancelToken? cancelToken,
   }) async* {
-    if (provider == 'aro' && attachments.isNotEmpty) {
-      throw StateError("ARO 1.5 can't read images yet. Pick Claude, ChatGPT, Gemini or Qwen to send images.");
+    if (provider == 'aro' && attachments.isNotEmpty && aroModel != 'auto' && aroModel != 'aro-vision') {
+      throw StateError('This ARO model reads text only. Pick ARO Vision or ARO (Auto) to send images.');
     }
 
     final apiKeys = await _userSettingsRepository.getApiKeys(uid);
@@ -34,7 +36,9 @@ class SendMessageUseCase {
       throw StateError('No API key set for $provider. Add one in Settings → AI Providers.');
     }
 
-    final model = apiKeys.modelFor(provider, hasImages: attachments.isNotEmpty);
+    final model = provider == 'aro'
+        ? (aroModel ?? 'auto')
+        : apiKeys.modelFor(provider, hasImages: attachments.isNotEmpty);
 
     await _conversationRepository.appendMessage(
       conversationId: conversationId,

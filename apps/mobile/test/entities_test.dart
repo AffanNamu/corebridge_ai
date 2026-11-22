@@ -1,3 +1,4 @@
+import 'package:corebridge_mobile/core/providers/selected_model_provider.dart';
 import 'package:corebridge_mobile/domain/entities/agent_session.dart';
 import 'package:corebridge_mobile/domain/entities/message_entity.dart';
 import 'package:corebridge_mobile/domain/entities/user_api_keys.dart';
@@ -73,5 +74,17 @@ void main() {
     expect(back.timeline.last.text, 'step ${items.length - 1}');
     expect(back.workBranch, 'aro/fix-it-abc12');
     expect(back.commitCount, 2);
+  });
+
+  test('picker offers ARO Auto first, the chat specialists, then BYOK providers', () {
+    expect(availableModels.first.label, 'ARO (Auto)');
+    expect(availableModels.first.aroModel, 'auto');
+    final aro = availableModels.where((m) => m.isAro).map((m) => m.aroModel).toList();
+    expect(aro, ['auto', 'aro-1.5', 'aro-code', 'aro-research', 'aro-translate', 'aro-vision']);
+    // Voice and Creative are used from their own screens, not the chat picker.
+    expect(aro, isNot(contains('aro-voice')));
+    expect(aro, isNot(contains('aro-creative')));
+    expect(availableModels.where((m) => !m.isAro).map((m) => m.provider), ['claude', 'openai', 'gemini', 'qwen']);
+    expect(availableModels.where((m) => m.supportsVision && m.isAro).map((m) => m.aroModel), ['auto', 'aro-vision']);
   });
 }

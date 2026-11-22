@@ -55,7 +55,7 @@ class AiRouterClient {
 
       if (response.statusCode != 200) {
         final errorBody = await response.transform(utf8.decoder).join();
-        throw HttpException('ai-router error (${response.statusCode}): $errorBody');
+        throw HttpException(_errorMessage(response.statusCode, errorBody));
       }
 
       var buffer = '';
@@ -81,10 +81,14 @@ class AiRouterClient {
             }
             final meta = decoded['meta'];
             if (meta is Map) {
+              final usage = meta['usage'];
               yield AiStreamEvent(
                 type: AiStreamEventType.meta,
                 servedBy: meta['servedBy'] as String?,
                 model: meta['model'] as String?,
+                aroModel: meta['aroModel'] as String?,
+                notice: meta['notice'] as String?,
+                remaining: usage is Map ? (usage['remaining'] as num?)?.toInt() : null,
               );
               continue;
             }
@@ -160,6 +164,38 @@ class AiRouterClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// The user's plan, credits and per-model access (ai-router 'overview').
+  Future<Map<String, dynamic>> overview() async {
+    if (supabaseFunctionsBaseUrl.trim().isEmpty) {
+      throw StateError('App was built without SUPABASE_FUNCTIONS_URL. Rebuild with the correct --dart-define.');
+    }
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) throw StateError('Sign in first.');
+    final idToken = await firebaseUser.getIdToken();
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(Uri.parse('$supabaseFunctionsBaseUrl/ai-router'));
+      request.headers.contentType = ContentType('application', 'json', charset: 'utf-8');
+      request.headers.set('Authorization', 'Bearer $idToken');
+      request.add(utf8.encode(jsonEncode({'action': 'overview'})));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != 200) throw HttpException(_errorMessage(response.statusCode, body));
+      return jsonDecode(body) as Map<String, dynamic>;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// The server's own message (e.g. "ARO Code isn't included in Free…").
+  static String _errorMessage(int status, String body) {
+    try {
+      final message = (jsonDecode(body) as Map<String, dynamic>)['error'];
+      if (message is String && message.isNotEmpty) return message;
+    } catch (_) {}
+    return 'ai-router error ($status)';
   }
 
   void dispose() {}

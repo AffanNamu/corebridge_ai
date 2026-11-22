@@ -26,11 +26,22 @@ class AiStreamEvent {
   /// For [AiStreamEventType.saved]: the Firestore id of the saved reply.
   final String? messageId;
 
+  /// For [AiStreamEventType.meta] on ARO: which ARO model answered
+  /// ('aro-code', ...), and a note to show (e.g. why Auto used ARO 1.5).
+  final String? aroModel;
+  final String? notice;
+
+  /// For [AiStreamEventType.meta] on ARO: requests left today (null = no cap).
+  final int? remaining;
+
   const AiStreamEvent({
     required this.type,
     this.text = '',
     this.servedBy,
     this.model,
     this.messageId,
+    this.aroModel,
+    this.notice,
+    this.remaining,
   });
 }

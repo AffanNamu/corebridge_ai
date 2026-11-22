@@ -20,6 +20,7 @@ import '../../domain/repositories/project_repository.dart';
 import '../../domain/repositories/user_settings_repository.dart';
 import '../../domain/usecases/create_artifact_usecase.dart';
 import '../../domain/usecases/send_message_usecase.dart';
+import '../network/admin_client.dart';
 import '../network/agent_client.dart';
 import '../network/api_client.dart';
 
@@ -92,4 +93,7 @@ final agentClientProvider = Provider<AgentClient>((ref) {
 });
 final agentSessionRepositoryProvider = Provider<AgentSessionRepository>((ref) {
   return AgentSessionRepositoryImpl(ref.watch(firestoreProvider));
+});
+final adminClientProvider = Provider<AdminClient>((ref) {
+  return AdminClient(ref.watch(supabaseFunctionsUrlProvider));
 });

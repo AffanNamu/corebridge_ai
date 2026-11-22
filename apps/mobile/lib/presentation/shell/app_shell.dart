@@ -27,6 +27,7 @@ class AppShell extends ConsumerWidget {
   // push() so GoRouter gives them a real back-stack entry, which the
   // system back button (and an AppBar back arrow) can pop naturally.
   static const _settingsItems = [
+    _NavItem('/plan', Icons.workspace_premium_outlined, 'Models & Plan', push: true),
     _NavItem('/settings', Icons.settings_outlined, 'Settings', push: true),
     _NavItem('/api-providers', Icons.power_settings_new_rounded, 'API Providers', push: true),
     _NavItem('/usage-stats', Icons.bar_chart_rounded, 'Usage & Stats', push: true),

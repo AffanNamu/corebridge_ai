@@ -52,7 +52,7 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
   String? _keyFor(String provider) => _keys.forProvider(provider);
 
   String _providerName(String key) {
-    if (key == 'aro') return AiModels.aroDisplayName;
+    if (key == 'aro') return 'ARO';
     return _providers.firstWhere((p) => p.key == key, orElse: () => _ProviderMeta(key, key, AppColors.accentBlue, Icons.hub_rounded)).name;
   }
 
@@ -81,8 +81,8 @@ class _ApiProvidersScreenState extends ConsumerState<ApiProvidersScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(AiModels.aroDisplayName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-                const Text("ARO AI's own model — built in, no key needed", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                const Text('ARO models', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                const Text("ARO AI's own models — built in, no key needed. Your plan decides which ones you can use.", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
               ],
             ),
           ),

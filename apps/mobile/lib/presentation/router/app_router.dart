@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/di/providers.dart';
+import '../screens/admin_screen.dart';
 import '../screens/api_providers_screen.dart';
 import '../screens/artifacts_screen.dart';
 import '../screens/auth_screen.dart';
@@ -13,6 +14,7 @@ import '../screens/files_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/knowledge_base_screen.dart';
+import '../screens/plan_screen.dart';
 import '../screens/projects_screen.dart';
 import '../screens/prompt_library_screen.dart';
 import '../screens/settings_screen.dart';
@@ -61,6 +63,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
           GoRoute(path: '/api-providers', builder: (context, state) => const ApiProvidersScreen()),
           GoRoute(path: '/usage-stats', builder: (context, state) => const UsageStatsScreen()),
+          GoRoute(path: '/plan', builder: (context, state) => const PlanScreen()),
+          // Server-side checks (ADMIN_UIDS) protect every admin action.
+          GoRoute(path: '/admin', builder: (context, state) => const AdminScreen()),
         ],
       ),
     ],

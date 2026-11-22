@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/di/providers.dart';
 import '../../core/providers/conversation_provider.dart';
 import '../../core/providers/selected_model_provider.dart';
@@ -200,6 +201,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         userMessage: text,
         history: cleanHistory,
         provider: selectedModel.provider,
+        aroModel: selectedModel.aroModel,
         attachments: attachments,
         thinkingEnabled: thinkingEnabled,
         cancelToken: cancelToken,
@@ -230,6 +232,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 model: event.model,
               );
             });
+            _showRouterNotice(event);
             continue;
           case AiStreamEventType.saved:
             final savedId = event.messageId;
@@ -270,6 +273,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _activeCancelToken = null;
       setState(() => _isSending = false);
     }
+  }
+
+  /// Tells the user when the ARO router had to change models, or when
+  /// they're about to run out of today's requests.
+  void _showRouterNotice(AiStreamEvent event) {
+    final remaining = event.remaining;
+    final message = event.notice ??
+        (remaining != null && remaining <= 3
+            ? (remaining == 0 ? 'That was your last request for today on this model.' : '$remaining requests left today on this model.')
+            : null);
+    if (message == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(label: 'Plans', onPressed: () => context.push('/plan')),
+      ),
+    );
   }
 
   /// 👍 (1) or 👎 (-1). A 👎 asks for an optional better answer — those
