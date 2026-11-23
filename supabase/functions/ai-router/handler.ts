@@ -40,6 +40,14 @@ import {
 } from '../_shared/cost.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
 import {
+  LANGUAGE_RULES,
+  languageGrounding,
+  languagesIn,
+  limitedLanguages,
+  sentenceTranslationDirective,
+  sentenceTranslationInto,
+} from '../_shared/languages.ts';
+import {
   formatResults,
   type Page,
   readPage,
@@ -147,8 +155,23 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
     return providerErrorResponse(err);
   }
 
+  // Nigerian languages: verified facts + no-invention rules, so ARO doesn't make up
+  // words or classifications (see _shared/languages.ts). Translation always gets the rules.
+  const languages = aro ? languagesIn(messages) : [];
+  let grounding = aro
+    ? (languages.length ? languageGrounding(languages) : aro.aroModel === 'aro-translate' ? LANGUAGE_RULES : '')
+    : '';
+  const lastUserForLang = [...messages].reverse().find((m) => m.role === 'user');
+  const into = aro && lastUserForLang ? sentenceTranslationInto(textOf(lastUserForLang.content)) : null;
+  if (into && limitedLanguages(env).has(into)) {
+    // ARO 1.5 invents text when writing whole sentences in these languages: decline honestly.
+    grounding = `${grounding ? `${grounding}\n\n` : ''}${sentenceTranslationDirective(into)}`;
+  }
   let finalMessages: ChatMessage[] = aro
-    ? [{ role: 'system', content: aro.systemPrompt }, ...messages.filter((m) => m.role !== 'system')]
+    ? [
+      { role: 'system', content: grounding ? `${aro.systemPrompt}\n\n${grounding}` : aro.systemPrompt },
+      ...messages.filter((m) => m.role !== 'system'),
+    ]
     : messages;
   const thinking = body.thinkingEnabled === true;
 
@@ -176,6 +199,7 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
       routed: aro.routed,
       ...(aro.notice ? { notice: aro.notice } : {}),
       ...(trimmed ? { trimmed } : {}),
+      ...(languages.length ? { languages } : {}),
       usage: {
         plan: aro.authorization.plan,
         via: aro.authorization.via,
@@ -259,6 +283,15 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   return new Response(stream, { headers: SSE_HEADERS });
 }
 
+const REPEAT_WINDOW = 400;
+const REPEAT_NOTICE = '\n\n[Stopped: this answer started repeating itself, so it is probably unreliable. ' +
+  "For languages ARO doesn't know well, please check with a native speaker.]";
+
+/** True when the end of the text is one short word or chunk repeated many times ("ọkụ ọkụ ọkụ …"). */
+export function isRepeating(text: string): boolean {
+  return /(\S{1,20}?)(?:[\s,.;:!?-]*\1){15,}[\s,.;:!?-]*\S{0,20}$/u.test(text);
+}
+
 export interface StreamOptions {
   maxTokens?: number;
   /** Called with each piece of answer text (not thinking). */
@@ -285,6 +318,7 @@ export async function streamWithFallback(
     let usage: Usage | undefined;
     const meta = () => sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model, ...metaExtra } });
     try {
+      let tail = '';
       for await (const event of streamChat(endpoint, messages, { thinking, fetchImpl, maxTokens: options.maxTokens })) {
         if (event.type === 'usage') {
           usage = { input: event.input, output: event.output, cached: event.cached };
@@ -294,7 +328,15 @@ export async function streamWithFallback(
           started = true;
           emit(meta());
         }
-        if (event.type === 'content') options.onText?.(event.text);
+        if (event.type === 'content') {
+          tail = (tail + event.text).slice(-REPEAT_WINDOW);
+          if (isRepeating(tail)) {
+            // The model is stuck repeating itself: stop and say so instead of streaming filler.
+            emit(sseFrame({ delta: REPEAT_NOTICE }));
+            return { endpoint, usage };
+          }
+          options.onText?.(event.text);
+        }
         emit(sseFrame(event.type === 'thinking' ? { thinking: event.text } : { delta: event.text }));
       }
       if (!started) emit(meta());

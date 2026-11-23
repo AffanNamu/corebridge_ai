@@ -152,6 +152,28 @@ def web_grounded_for(spec: ModelSpec) -> list[dict[str, Any]]:
     return out
 
 
+def language_facts_for(spec: ModelSpec) -> list[dict[str, Any]]:
+    """Verified Nigerian-language facts and honest "I'm not sure" answers (seed/language_facts.jsonl).
+
+    ARO 1.5 was seen inventing Hausa greetings and words and misclassifying
+    Hausa as Niger-Congo; these teach the facts and to admit uncertainty.
+    """
+    out = []
+    with (SEED_DIR / "language_facts.jsonl").open(encoding="utf-8") as f:
+        for i, line in enumerate(l for l in f if l.strip()):
+            row = json.loads(line)
+            out.append({
+                "messages": [
+                    {"role": "system", "content": spec.system_prompt},
+                    {"role": "user", "content": row["user"]},
+                    {"role": "assistant", "content": row["assistant"]},
+                ],
+                "source": f"language-facts:{i}",
+                "kind": "language",
+            })
+    return out
+
+
 # ------------------------------------------------------------------ loaders
 
 def _hf(dataset_id: str, split: str, config: str | None = None, take: int | None = None):

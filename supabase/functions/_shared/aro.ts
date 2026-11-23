@@ -191,6 +191,8 @@ export async function resolveAro(
  * Endpoints to try, in order: the model on its server, then (for text
  * specialists) ARO 1.5 on the same server, then the backup model.
  */
+export const ARO_REPETITION_PENALTY = 1.1;
+
 export function aroEndpoints(kind: string, servedName: string, env: Env): Endpoint[] {
   const endpoints: Endpoint[] = [];
   const key = cleanKey(env('ARO_MODEL_API_KEY')) || 'aro-no-key';
@@ -207,9 +209,12 @@ export function aroEndpoints(kind: string, servedName: string, env: Env): Endpoi
   } else {
     const url = env('ARO_MODEL_BASE_URL')?.trim();
     if (url) {
-      endpoints.push({ provider: 'aro', kind: 'openai', baseUrl: strip(url), apiKey: key, model: servedName, servedBy: 'aro' });
+      // A mild repetition penalty (vLLM sampling option): the small model can otherwise
+      // loop on a word when it writes in a language it barely knows.
+      const extraBody = { repetition_penalty: ARO_REPETITION_PENALTY };
+      endpoints.push({ provider: 'aro', kind: 'openai', baseUrl: strip(url), apiKey: key, model: servedName, servedBy: 'aro', extraBody });
       if (servedName !== 'aro-1.5') {
-        endpoints.push({ provider: 'aro', kind: 'openai', baseUrl: strip(url), apiKey: key, model: 'aro-1.5', servedBy: 'aro' });
+        endpoints.push({ provider: 'aro', kind: 'openai', baseUrl: strip(url), apiKey: key, model: 'aro-1.5', servedBy: 'aro', extraBody });
       }
     }
     const fallbackUrl = env('ARO_FALLBACK_BASE_URL')?.trim();

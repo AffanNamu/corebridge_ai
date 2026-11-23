@@ -93,6 +93,36 @@ Before any model is called, the server checks the user's access in Postgres (`ar
 
 If the model fails before answering, the request is refunded.
 
+## Language accuracy (Nigerian languages)
+
+**The audit.** ARO 1.5's foundation model knows little Hausa, Yoruba, Igbo or Fulfulde. An audit on 2026-11-24 found it confidently:
+- classifying Hausa as "Niger-Congo, Kordofanian branch". Hausa is **Afroasiatic, Chadic branch**.
+- inventing greetings ("Aba!") and words ("Kamalama" for thank you). The real word is **Na gode**.
+- misexplaining kai/ke, which are **you (to a man) / you (to a woman)**
+- writing made-up Igbo that looped on one word
+
+**The fix, in the existing pipeline:**
+1. **Verified reference** (`supabase/functions/_shared/languages.ts`): hand-checked facts for Hausa, Yoruba, Igbo, Fulfulde and Nigerian Pidgin:
+   - classification, per Glottolog and Ethnologue
+   - writing system
+   - everyday greetings, with meanings and replies
+   - dialect notes
+
+   When a conversation names one of these languages, or is written in it, ai-router adds the relevant entries to ARO's instructions.
+2. **No-invention rules:** sent with the reference, and always with the translation capability:
+   - never invent words, translations, greetings, proverbs or etymologies
+   - say when unsure, and label any attempt as unverified
+   - mention dialect, gender and politeness differences
+   - use the borrowed form for technical terms instead of coining one
+3. **Full sentences:** for a full-sentence translation *into* Hausa, Yoruba, Igbo or Fulfulde, ARO 1.5 says it can't do that reliably yet. It offers verified phrases and suggests a native speaker, the Web button or another model. Set `ARO_SENTENCE_TRANSLATION_LIMITED` (default `ha,yo,ig,ff`) to an empty value once a trained translation adapter passes the test sets.
+4. **Loop guard:**
+   - ARO's own server gets a mild repetition penalty
+   - any reply that starts repeating one word is stopped, with a note that it's probably unreliable
+5. **Training:** `training/seed/language_facts.jsonl` holds the same facts plus honest "I'm not sure" answers, and is included in every ARO 1.5 capability's training data.
+6. **Regression tests:** `language-facts` and `language-honesty` items in `training/eval/aro-1.5.jsonl` and `aro-translate.jsonl`. The errors above are critical items, so a new version that brings any of them back can't be promoted. Tests check that the audit's actual wrong answers score 0.
+
+**Adding to the reference:** only add facts you can verify from a reliable source or a native speaker. A wrong "verified" fact is worse than none.
+
 ## Data
 
 [`training/aro_data/DATASETS.md`](../training/aro_data/DATASETS.md) is generated from the dataset registry. It covers every dataset in the brief, plus SMOL, Aya, AfriMGSM and others found during research, each with its license status. Main rules:

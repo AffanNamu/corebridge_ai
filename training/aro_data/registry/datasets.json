@@ -1956,6 +1956,41 @@
       "notes": "Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned."
     },
     {
+      "id": "aro-language-facts",
+      "name": "ARO verified Nigerian-language facts seed",
+      "publisher": "ARO AI",
+      "source_url": "training/seed/language_facts.jsonl",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "repo",
+      "size": "15 examples",
+      "format": "",
+      "languages": [
+        "en",
+        "ha",
+        "yo",
+        "ig",
+        "ff",
+        "pcm"
+      ],
+      "license": "proprietary (ARO AI)",
+      "license_checked": "owned by ARO AI",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "hand-written",
+      "models": [
+        "aro-1.5",
+        "aro-code",
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Hand-checked facts about Hausa, Yoruba, Igbo, Fulfulde and Nigerian Pidgin (classification per Glottolog/Ethnologue, everyday greetings) and examples of admitting uncertainty instead of inventing words. Mirrors supabase/functions/_shared/languages.ts."
+    },
+    {
       "id": "aro-user-feedback",
       "name": "ARO user feedback",
       "publisher": "ARO AI users (opt-in)",

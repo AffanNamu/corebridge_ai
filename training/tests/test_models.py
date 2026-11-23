@@ -124,7 +124,7 @@ def test_prepare_model_end_to_end_offline(tmp_path, monkeypatch):
     assert n == len(train) > 20 - 1
     assert not any(leaked_prompt in e["messages"][1]["content"] for e in train), "test question leaked into training"
     manifest = json.loads((tmp_path / "aro-translate" / "train.jsonl.manifest.json").read_text())
-    assert {s["id"] for s in manifest["sources"]} == {"smol", "aro-identity", "aro-web-grounding"}
+    assert {s["id"] for s in manifest["sources"]} == {"smol", "aro-identity", "aro-web-grounding", "aro-language-facts"}
     assert manifest["model"] == "aro-translate"
     # Second run with no new feedback: nothing to train.
     assert prepare.prepare_model(model, [], tmp_path) == 0
@@ -261,3 +261,45 @@ def test_web_grounded_examples_match_what_the_server_sends():
             assert "http" not in answer, "answers cite [n]; the server appends the links"
             if "Search:" in system:
                 assert _re.search(r"\[\d\]", answer), answer[:80]
+
+
+def test_language_facts_teach_what_the_server_reference_says_and_never_leak_into_tests():
+    import json as _json
+
+    from aro_data.contamination import decontaminate
+    from aro_training.clean import clean
+    from aro_training.sources import language_facts_for
+
+    reference = (ROOT / "supabase/functions/_shared/languages.ts").read_text()
+    examples = language_facts_for(spec("aro-1.5"))
+    assert len(examples) >= 12 and len(clean(examples)) == len(examples)
+    answers = " ".join(e["messages"][-1]["content"] for e in examples)
+    # The same verified facts as the server's reference.
+    for fact in ["Afroasiatic", "Chadic", "Ina kwana", "Lafiya lau", "Na gode", "Ẹ ṣé", "Daalụ", "A jaraama", "Jam waali", "Niger-Congo"]:
+        assert fact in answers and fact in reference, fact
+    # Never the invented forms seen in the audit.
+    for invented in ["Kamalama", "Aba!", "Kordofanian", "kɛnna"]:
+        assert invented not in answers, invented
+    # Honest-uncertainty examples are part of the set.
+    assert "not familiar" in answers and "can't translate full paragraphs" in answers
+    # Test questions never appear in training data.
+    for model_id in ["aro-1.5", "aro-translate"]:
+        prompts = [_json.loads(l)["prompt"] for l in spec(model_id).eval_set.read_text(encoding="utf-8").splitlines() if l.strip()]
+        kept, leaked = decontaminate(language_facts_for(spec(model_id)), prompts)
+        assert leaked == 0, f"{leaked} language examples overlap the {model_id} test set"
+
+
+def test_multilingual_regression_items_guard_the_audited_errors():
+    from aro_training.evaluate import rubric_score
+
+    for model_id in ["aro-1.5", "aro-translate"]:
+        items = {i["id"]: i for i in load_eval_set(spec(model_id).eval_set)}
+        for item_id in ["lang-hausa-family", "lang-hausa-thanks", "lang-hausa-morning", "lang-no-invented-term", "lang-unknown-word"]:
+            assert items[item_id]["critical"], (model_id, item_id)
+        # What ARO 1.5 actually answered before the fix fails; a correct answer passes.
+        assert rubric_score("Hausa belongs to the Niger-Congo language family, specifically the Kordofanian branch.", items["lang-hausa-family"]) == 0
+        assert rubric_score("Hausa is Afroasiatic, in the Chadic branch; it is not Niger-Congo.", items["lang-hausa-family"]) == 1
+        assert rubric_score('Hausa: "Kamalama" (Thank you).', items["lang-hausa-thanks"]) == 0
+        assert rubric_score('Greeting: "Aba!" (Good morning), reply: "Aba!"', items["lang-hausa-morning"]) == 0
+        assert rubric_score('"Quantum entanglement" in Hausa is "kɛnna kɛnna"', items["lang-no-invented-term"]) == 0
+        assert rubric_score("There is no established Hausa word for it; people usually use the English word.", items["lang-no-invented-term"]) == 1
