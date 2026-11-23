@@ -18,9 +18,9 @@ Status: ✅ in place · 🟡 partial · ❌ missing
 
 | Pattern | Today | Status |
 |---|---|---|
-| Strict RAG | No vector database or knowledge graph. Grounding exists only as: web search when requested (`_shared/web.ts`), and a static verified reference for Nigerian languages (`_shared/languages.ts`), injected by keyword. The **Knowledge Base screen is a placeholder** that stores nothing. `pgvector` is available in Supabase but not installed. | ❌ |
-| Citation enforcement | The web mode tells the model to cite `[n]` and appends a Sources list. Nothing checks that the cited numbers exist or that claims match the sources. There is no retrieval confidence and no "not enough verified data" fallback. | 🟡 |
-| Deterministic tools | Chat has **no tools**: ARO does maths and dates in text. The agent has repository and web tools, but no calculator, date or SQL tool. | ❌ |
+| Strict RAG | **Phase 3 (done):** a real Knowledge Base. Upload PDF (text layer), Word .docx, text, Markdown, CSV, JSON or code, or paste text (`aro-knowledge`). Documents are split into ~1,800-character passages with overlap (`aro_kb_documents` / `aro_kb_chunks`, per user, service_role only). Search is hybrid: keyword search (`'simple'` text search, so Hausa, Yoruba and Igbo letters work) plus `pg_trgm`, plus `pgvector` bge-m3 vectors when `EMBEDDINGS_BASE_URL` is set, fused with reciprocal-rank fusion. A **confidence threshold** (query-word coverage, or cosine ≥ 0.5) decides what reaches the model; unrelated questions get no passages. With **"Docs only"** on and nothing relevant found, there is no model call and no charge, and ARO says it couldn't find it instead of guessing. **Still open:** global ARO product and support knowledge; embeddings stay keyword-only until an embedding endpoint is deployed. | 🟡 |
+| Citation enforcement | **Phase 3 (done for the Knowledge Base):** passages are labelled `[K1]…`, and after the answer `verifyCitations` checks that every cited label exists and that the citing sentence's key words appear in that passage. In Docs-only mode an answer that cites nothing is flagged. Problems are shown under the answer, followed by a "From your documents" list. Web mode still only lists its sources. | 🟡 |
+| Deterministic tools | **Phase 1 (done):** `calculate` and `date_math` for the agent and chat. `query_data` (read-only SQL over the user's data) is not built. | 🟡 |
 
 **What to build:**
 - **Knowledge store:** Postgres + `pgvector` + `pg_trgm` hybrid search. Tables `kb_sources`, `kb_chunks(embedding vector, tsv, …)`, with row ownership: global ARO knowledge (product, plans, language facts) plus each user's own documents. This makes the Knowledge Base screen real.
@@ -42,8 +42,8 @@ Status: ✅ in place · 🟡 partial · ❌ missing
 
 | Tier | Today | Status |
 |---|---|---|
-| Short-term | Chat: `fitToContext` **drops** the oldest messages at the context limit. Agent: `compactTranscript` shortens old tool output and drops old exchanges. No summarisation, and no 70% trigger. | 🟡 |
-| Long-term semantic | None. Conversations are stored in Firestore, but nothing is remembered across chats (preferences, facts, rules). | ❌ |
+| Short-term | **Phase 3 (chat on ARO, done):** past 70% of ARO's input budget, the oldest messages are condensed into a summary instead of being dropped (`_shared/summary.ts`). Summaries are made in blocks of 8 messages and stored by a hash of the prefix they cover (`aro_conversation_summaries`, 30 days), so each block is summarised once and later turns reuse it. `fitToContext` remains as the safety net. Bring-your-own-key models have large windows and aren't summarised. **Still open:** the agent transcript still uses `compactTranscript`. | 🟡 |
+| Long-term semantic | **Phase 3 (done):** opt-in memory, **off by default** (`aro_memories`, `aro_memory_settings`). When on: "remember that…" / "from now on…" saves, and "forget…" deletes. Durable facts the user states about themselves (name, work, language, answer preferences, standing rules) are extracted by one small call from the user's own words only, never documents, web pages or answers. Sensitive categories are excluded, and near-duplicates are skipped. Each turn gets the newest rules and preferences plus the entries that match the message. Settings → Memory shows every entry with delete and delete-all. Answers that use memory are never cached. | ✅ |
 | Episodic / procedural | **Phase 2 (agent, done):** `aro_agent_episodes` (per user and repository, service_role only, RLS on) logs declined actions with the user's reason, commits held back by review, loops, and failed runs. The newest 8 are put in the agent's system prompt at the start of every run on that repository. The newest 50 per repository are kept, for 90 days at most. **Still open:** CI failures after a push, chat 👎 corrections, and similarity search (Phase 3, with embeddings). | 🟡 |
 
 **What to build:**
@@ -118,12 +118,12 @@ Each phase builds on the one before and ships independently, with tests.
 |---|---|---|---|
 | **1. Foundation** ✅ (guided JSON still open) | Agent state machine + Postgres checkpoints + confirmation gates · strict schema validation of tool calls (+ guided JSON for ARO) · deterministic `calculate` / `date_math` tools for the agent and chat | Everything else (plans, critics, sandbox steps, retries) plugs into the state machine. Schemas stop malformed calls today. Calculator and date tools remove a whole class of hallucination cheaply. | M |
 | **2. Plan and critique** ✅ (similarity search for episodes moves to Phase 3) | JSON plan step (shown to the user; it becomes the step list) · critic before commit and for long code answers · episodic log of agent failures and corrections, checked before runs | Needs the Phase 1 state machine. It turns the agent from act-first into plan → act → check. | M |
-| **3. Knowledge and memory** | `pgvector` + `pg_trgm` knowledge store · real Knowledge Base (upload, chunk, embed) · strict-RAG router with confidence threshold · citation verifier · rolling summaries at 70% · long-term `memories` with consent | The largest piece, and it needs product decisions: which domains count as "ours", and the memory consent design. | L |
+| **3. Knowledge and memory** ✅ (embedding endpoint and global product knowledge still open) | `pgvector` + `pg_trgm` knowledge store · real Knowledge Base (upload, chunk, embed) · strict-RAG router with confidence threshold · citation verifier · rolling summaries at 70% · long-term `memories` with consent | The largest piece, and it needs product decisions: which domains count as "ours", and the memory consent design. | L |
 | **4. Real execution** | Sandbox runner (RunPod CPU serverless) + `run_in_sandbox` · tests run in `VERIFY_STEP` before commit · Python for heavy data and maths | Needs infrastructure and a vendor or isolation decision. Plugs into the Phase 1 state machine. | M–L |
 
-## Decisions needed
+## Decisions
 
-1. **Strict-RAG domains:** which questions must be answered only from your data? Proposed: ARO product and support, the user's own Knowledge Base documents, and verified language facts. General questions keep using the model and web search.
+1. **Strict-RAG domains:** decided for Phase 3: the user's own Knowledge Base documents, on demand ("Docs only"). ARO product and support knowledge is still open.
 2. **Sandbox:** a RunPod Serverless CPU endpoint (self-run, no new vendor; pay per second) or a hosted sandbox such as E2B (stronger isolation out of the box; new vendor and key).
-3. **Long-term memory:** opt-in or on by default, with a visible "What ARO remembers" page in Settings either way.
-4. **Embedding model:** `BAAI/bge-m3` (MIT, multilingual) on the existing RunPod setup, after the Data Engine license check.
+3. **Long-term memory:** decided: opt-in (off by default), with Settings → Memory.
+4. **Embedding model:** `BAAI/bge-m3` (MIT, multilingual). It needs its own scale-to-zero RunPod endpoint: one vLLM worker serves one model, so the ARO 1.5 endpoint can't serve it too. Set `EMBEDDINGS_BASE_URL` (and `EMBEDDINGS_API_KEY`) in Supabase once it exists. Documents added before that stay keyword-searchable.

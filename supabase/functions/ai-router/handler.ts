@@ -40,6 +40,9 @@ import {
 } from '../_shared/cost.ts';
 import { computeForChat, mentionsDate } from '../_shared/compute.ts';
 import { type Review, REVIEW_RULES, runReview } from '../_shared/review.ts';
+import { citationNote, knowledgeBlock, knowledgeSources, notFoundMessage, type Retrieval, retrieve, searchTerms, verifyCitations } from '../_shared/knowledge.ts';
+import { extractMemories, hasMemoryCue, kindOf, memoryBlock, MEMORY_OFF_NOTE, parseMemoryCommand } from '../_shared/memory.ts';
+import { condenseConversation } from '../_shared/summary.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
 import {
   LANGUAGE_RULES,
@@ -182,13 +185,60 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   const lastUserText = lastUser ? textOf(lastUser.content) : '';
   const web = body.webSearch === true || (body.webSearch !== false && wantsWeb(lastUserText));
 
+  // Knowledge Base: passages from the user's own documents that clear the confidence threshold.
+  // "strict" = only my documents (no answer without them); "off" skips retrieval.
+  const knowledgeMode: 'auto' | 'strict' | 'off' = body.knowledge === 'strict' ? 'strict' : body.knowledge === 'off' ? 'off' : 'auto';
+  let kb: Retrieval = { documents: 0, passages: [], searched: false };
+  if (db && knowledgeMode !== 'off' && lastUserText.trim()) {
+    kb = await retrieve(db, user.uid, lastUserText, { env, fetchImpl: deps.fetchImpl })
+      .catch((e) => (console.warn('knowledge retrieval failed', e), kb));
+  }
+  const passages = kb.passages;
+  const strict = knowledgeMode === 'strict';
+  if (passages.length) finalMessages = withSystemBlock(finalMessages, knowledgeBlock(passages, strict));
+
+  // Long-term memory (only when the user turned it on): explicit remember/forget, then what's relevant now.
+  const command = parseMemoryCommand(lastUserText);
+  let memory: { enabled: boolean; memories: string[] } = { enabled: false, memories: [] };
+  if (db) {
+    memory = await db.rpc<typeof memory>('aro_memory_context', { p_user: user.uid, p_terms: searchTerms(lastUserText), p_limit: 8 })
+      .catch(() => memory) ?? memory;
+  }
+  const memoryEvents: { saved?: string[]; forgotten?: string[] } = {};
+  if (command && db) {
+    if (!memory.enabled) {
+      finalMessages = withSystemBlock(finalMessages, MEMORY_OFF_NOTE);
+    } else if (command.type === 'remember') {
+      const r = await db.rpc<{ saved: boolean; reason?: string }>('aro_memory_add', { p_user: user.uid, p_kind: command.kind, p_content: command.content, p_source: 'explicit' })
+        .catch(() => null);
+      if (r?.saved) memoryEvents.saved = [command.content];
+      finalMessages = withSystemBlock(finalMessages, r?.saved || r?.reason === 'duplicate'
+        ? `The user asked you to remember: "${command.content}". It is saved in their memory. Confirm in one short sentence.`
+        : 'The user asked you to remember something but saving failed. Say so briefly and suggest trying again.');
+    } else {
+      const removed = await db.rpc<string[]>('aro_memory_forget', { p_user: user.uid, p_text: command.content }).catch(() => []) ?? [];
+      memoryEvents.forgotten = removed;
+      finalMessages = withSystemBlock(finalMessages, removed.length
+        ? `You removed these from the user's memory: ${removed.map((m) => `"${m}"`).join(', ')}. Confirm in one short sentence.`
+        : `Nothing in the user's memory matched "${command.content}". Tell them, and that they can see everything in Settings → Memory.`);
+    }
+  }
+  const remembered = memory.enabled ? memory.memories.filter((m) => !memoryEvents.forgotten?.includes(m)) : [];
+  if (remembered.length) finalMessages = withSystemBlock(finalMessages, memoryBlock(remembered));
+
   // ARO: cap the answer length by plan and keep the conversation inside the context window.
+  // Past 70% of the window, older messages are condensed into a summary instead of being dropped.
   let maxTokens: number | undefined;
   let trimmed = 0;
+  let summarized = 0;
   if (aro) {
     maxTokens = limits.max_output_tokens ?? DEFAULT_ARO_MAX_TOKENS;
     const webRoom = web ? WEB_CONTEXT_TOKENS : 0;
-    const fit = fitToContext(finalMessages, aroContextTokens(env) - maxTokens - CONTEXT_MARGIN_TOKENS - webRoom);
+    const inputBudget = aroContextTokens(env) - maxTokens - CONTEXT_MARGIN_TOKENS - webRoom;
+    const condensed = await condenseConversation(finalMessages, inputBudget, { db, userId: user.uid, endpoint: endpoints[0], fetchImpl: deps.fetchImpl });
+    finalMessages = condensed.messages;
+    summarized = condensed.summarized;
+    const fit = fitToContext(finalMessages, inputBudget);
     finalMessages = fit.messages;
     trimmed = fit.droppedMessages + (fit.truncated ? 1 : 0);
   }
@@ -201,6 +251,7 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
       routed: aro.routed,
       ...(aro.notice ? { notice: aro.notice } : {}),
       ...(trimmed ? { trimmed } : {}),
+      ...(summarized ? { summarized } : {}),
       ...(languages.length ? { languages } : {}),
       usage: {
         plan: aro.authorization.plan,
@@ -211,9 +262,13 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
       },
     }
     : { traceId };
+  if (kb.documents) metaExtra.knowledge = { documents: kb.documents, passages: passages.length, strict };
+  if (memory.enabled) metaExtra.memory = { used: remembered.length };
 
   // Date answers depend on today's date: never cached.
-  const useCache = aro !== undefined && !web && !mentionsDate(lastUserText) && body.cache !== false && cacheable(finalMessages, thinking);
+  // Answers built from the user's own documents or memories are personal: never cached.
+  const useCache = aro !== undefined && !web && !mentionsDate(lastUserText) && !passages.length && !remembered.length && !command &&
+    body.cache !== false && cacheable(finalMessages, thinking);
   const key = useCache ? await cacheKey(`${aro!.aroModel}\n${aro!.systemPrompt}`, finalMessages) : '';
   const logBase = {
     traceId, userId: user.uid, surface: 'chat' as const, provider, aroModel: aro?.aroModel,
@@ -226,6 +281,14 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
       let served: Endpoint | undefined;
       let usage: Usage | undefined;
       try {
+        // "Only my documents" and nothing relevant found: say so instead of letting the model guess.
+        if (strict && !passages.length) {
+          controller.enqueue(sseFrame({ meta: { servedBy: 'knowledge', model: 'knowledge-base', ...metaExtra } }));
+          controller.enqueue(sseFrame({ delta: kb.documents ? notFoundMessage(kb.documents) : EMPTY_KB_MESSAGE }));
+          if (aro && db) await refund(db, user.uid, aro.aroModel, aro.authorization.via).catch((e) => console.error('ai-router: refund failed', e));
+          answered = true;
+          return;
+        }
         const hit = useCache ? await cacheGet(db, key) : null;
         if (hit !== null) {
           answered = true;
@@ -267,6 +330,14 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
         if (sources.length) controller.enqueue(sseFrame({ delta: sourcesMarkdown(sources) }));
         await logUsage(db, { ...logBase, model: served.model, servedBy: served.servedBy, usage, latencyMs: Date.now() - started }, env, deps.fetchImpl);
 
+        // Citation check: every [Kn] must exist and be backed by its passage.
+        if (passages.length) {
+          const check = verifyCitations(answer, passages, strict);
+          controller.enqueue(sseFrame({ citations: check }));
+          const extra = citationNote(check) + knowledgeSources(passages, check.cited);
+          if (extra) controller.enqueue(sseFrame({ delta: extra }));
+        }
+
         // Second check for long code answers: a fresh-context review; its findings are appended to the answer.
         let review: Review | null = null;
         if (body.review !== false && codeLines(answer) >= CODE_REVIEW_MIN_LINES && (served.kind === 'openai' || served.kind === 'anthropic')) {
@@ -282,6 +353,19 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
             if (review.issues.length) controller.enqueue(sseFrame({ delta: reviewMarkdown(review) }));
           }
         }
+        // Memory: durable facts/preferences the user just stated about themselves (memory on only).
+        if (memory.enabled && !command && hasMemoryCue(lastUserText)) {
+          const proposed = await extractMemories(served, lastUserText, deps.fetchImpl);
+          const saved: string[] = [];
+          for (const m of proposed) {
+            const r = await db!.rpc<{ saved: boolean }>('aro_memory_add', { p_user: user.uid, p_kind: m.kind || kindOf(m.content), p_content: m.content, p_source: 'auto' })
+              .catch(() => null);
+            if (r?.saved) saved.push(m.content);
+          }
+          if (saved.length) memoryEvents.saved = saved;
+        }
+        if (memoryEvents.saved?.length || memoryEvents.forgotten?.length) controller.enqueue(sseFrame({ memory: memoryEvents }));
+
         if (useCache && !review?.issues.length && served.servedBy === 'aro' && answer.trim() && answer.length <= MAX_CACHED_ANSWER_CHARS) {
           await cachePut(db, key, aro!.aroModel, answer);
         }
@@ -327,6 +411,9 @@ export function reviewMarkdown(review: Review): string {
   const lines = review.issues.map((i) => `- ${i.severity === 'blocker' ? '**Must fix:**' : 'Note:'} ${i.file ? `\`${i.file}\` — ` : ''}${i.problem}`);
   return `\n\n---\n**Second check** — a review of the code above found:\n${lines.join('\n')}`;
 }
+
+const EMPTY_KB_MESSAGE = 'Your Knowledge Base is empty, so there is nothing to answer from yet. Add documents in ' +
+  'Knowledge Base, or turn off "Only my documents" to get a general answer.';
 
 const REPEAT_WINDOW = 400;
 const REPEAT_NOTICE = '\n\n[Stopped: this answer started repeating itself, so it is probably unreliable. ' +

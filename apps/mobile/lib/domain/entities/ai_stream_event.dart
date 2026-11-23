@@ -10,6 +10,9 @@ enum AiStreamEventType {
 
   /// The finished reply was saved to Firestore under [messageId].
   saved,
+
+  /// Long-term memory changed during this reply ([text] says what, for a notice).
+  memory,
 }
 
 /// A single event from the AI stream.

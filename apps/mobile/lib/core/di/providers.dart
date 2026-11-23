@@ -22,6 +22,7 @@ import '../../domain/usecases/create_artifact_usecase.dart';
 import '../../domain/usecases/send_message_usecase.dart';
 import '../network/admin_client.dart';
 import '../network/agent_client.dart';
+import '../network/knowledge_client.dart';
 import '../network/api_client.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
@@ -88,6 +89,9 @@ final createArtifactUseCaseProvider = Provider<CreateArtifactUseCase>((ref) {
 });
 
 final gitHubApiProvider = Provider<GitHubApi>((ref) => GitHubApi());
+final knowledgeClientProvider = Provider<KnowledgeClient>((ref) {
+  return KnowledgeClient(ref.watch(supabaseFunctionsUrlProvider));
+});
 final agentClientProvider = Provider<AgentClient>((ref) {
   return AgentClient(ref.watch(supabaseFunctionsUrlProvider));
 });

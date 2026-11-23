@@ -181,13 +181,19 @@ Deno.test({ name: "long chats are fitted to ARO's context window, newest message
   const out = await frames(await chat(post('ai-router', { provider: 'aro', model: 'aro-1.5', messages }), {
     verify, db, fetchImpl: server.fetchImpl, env: env({ ARO_MODEL_BASE_URL: 'https://aro.example/v1', ARO_CONTEXT_TOKENS: '16384' }),
   }));
-  const sent: ChatMessage[] = server.bodies[0].messages;
+  // Past 70% of the window the oldest messages are first condensed into a summary (one extra call),
+  // then whatever still doesn't fit is trimmed.
+  assertEquals(server.bodies.length, 2);
+  assert(out[0].meta.summarized >= 8);
+  const sent: ChatMessage[] = server.bodies.at(-1).messages;
   assertEquals(sent[0].role, 'system');
+  assertStringIncludes(String(sent[0].content), 'Summary of the earlier part of this conversation');
   assertEquals(sent.at(-1)!.content, 'latest question');
   assertEquals(sent[1].role, 'user', 'never starts with an assistant turn');
   const tokens = sent.reduce((s, m) => s + estimateTokens(m.content), 0);
   assert(tokens <= 16384 - 1024 - 256, `sent ${tokens} tokens`);
-  assert(out[0].meta.trimmed > 0);
+  // The summary made room, so nothing had to be dropped.
+  assertEquals(out[0].meta.trimmed, undefined);
 } });
 
 Deno.test('fitToContext shortens the middle of a single huge message', () => {

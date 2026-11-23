@@ -47,6 +47,9 @@ final thinkingModeEnabledProvider = StateProvider<bool>((ref) => false);
 /// Off still lets the server search when the message asks for it ("search online…").
 final webSearchEnabledProvider = StateProvider<bool>((ref) => false);
 
+/// "Only my documents": answer only from the Knowledge Base, never guess.
+final knowledgeOnlyProvider = StateProvider<bool>((ref) => false);
+
 final draftMessageProvider = StateProvider<String>((ref) => '');
 
 /// Guards against re-applying the user's saved default provider every

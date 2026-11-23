@@ -132,6 +132,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final selectedModel = ref.read(selectedModelProvider);
     final thinkingEnabled = selectedModel.supportsThinking && ref.read(thinkingModeEnabledProvider);
     final webSearch = ref.read(webSearchEnabledProvider);
+    final knowledgeOnly = ref.read(knowledgeOnlyProvider);
 
     if (_conversationId == null) {
       if (_conversationCreation != null) {
@@ -206,6 +207,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         attachments: attachments,
         thinkingEnabled: thinkingEnabled,
         webSearch: webSearch,
+        knowledgeOnly: knowledgeOnly,
         cancelToken: cancelToken,
       )) {
         final index = _messages.indexWhere((m) => m.id == placeholderId);
@@ -235,6 +237,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               );
             });
             _showRouterNotice(event);
+            continue;
+          case AiStreamEventType.memory:
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(event.text),
+                action: SnackBarAction(label: 'Manage', onPressed: () => context.push('/memory')),
+              ));
+            }
             continue;
           case AiStreamEventType.saved:
             final savedId = event.messageId;

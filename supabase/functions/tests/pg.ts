@@ -2,6 +2,8 @@
 // applied, exposed through the same `Db` interface the Edge Functions use.
 
 import { PGlite } from 'npm:@electric-sql/pglite@0.2.17';
+import { vector } from 'npm:@electric-sql/pglite@0.2.17/vector';
+import { pg_trgm } from 'npm:@electric-sql/pglite@0.2.17/contrib/pg_trgm';
 import type { Db } from '../_shared/db.ts';
 
 const MIGRATIONS = new URL('../../migrations/', import.meta.url);
@@ -12,7 +14,7 @@ export interface TestDb extends Db {
 }
 
 export async function testDb(): Promise<TestDb> {
-  const pg = new PGlite();
+  const pg = new PGlite({ extensions: { vector, pg_trgm } });
   // Roles that Supabase provides.
   await pg.exec('create role anon nologin; create role authenticated nologin; create role service_role nologin;');
   const files = [...Deno.readDirSync(MIGRATIONS)].map((e) => e.name).filter((n) => n.endsWith('.sql')).sort();

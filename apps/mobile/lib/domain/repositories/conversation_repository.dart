@@ -41,6 +41,7 @@ abstract class ConversationRepository {
     required String apiKey,
     bool thinkingEnabled,
     bool webSearch,
+    bool knowledgeOnly,
     CancelToken? cancelToken,
   });
 }

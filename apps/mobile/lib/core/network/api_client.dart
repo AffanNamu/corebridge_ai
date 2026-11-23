@@ -16,6 +16,7 @@ class AiRouterClient {
     required String apiKey,
     bool thinkingEnabled = false,
     bool webSearch = false,
+    bool knowledgeOnly = false,
     CancelToken? cancelToken,
   }) async* {
     if (supabaseFunctionsBaseUrl.trim().isEmpty) {
@@ -50,6 +51,7 @@ class AiRouterClient {
         'apiKey': apiKey,
         'thinkingEnabled': thinkingEnabled,
         if (webSearch) 'webSearch': true,
+        if (knowledgeOnly) 'knowledge': 'strict',
       }));
       request.add(bodyBytes);
 
@@ -92,6 +94,17 @@ class AiRouterClient {
                 notice: meta['notice'] as String?,
                 remaining: usage is Map ? (usage['remaining'] as num?)?.toInt() : null,
               );
+              continue;
+            }
+            final memory = decoded['memory'];
+            if (memory is Map) {
+              final saved = ((memory['saved'] as List?) ?? const []).map((e) => '$e').toList();
+              final forgotten = ((memory['forgotten'] as List?) ?? const []).map((e) => '$e').toList();
+              final parts = [
+                if (saved.isNotEmpty) 'Saved to memory: ${saved.join('; ')}',
+                if (forgotten.isNotEmpty) 'Removed from memory: ${forgotten.join('; ')}',
+              ];
+              if (parts.isNotEmpty) yield AiStreamEvent(type: AiStreamEventType.memory, text: parts.join('\n'));
               continue;
             }
             final thinkingDelta = decoded['thinking'] as String?;

@@ -11,6 +11,7 @@ class ModelPickerChip extends ConsumerWidget {
     final selected = ref.watch(selectedModelProvider);
     final thinkingEnabled = ref.watch(thinkingModeEnabledProvider);
     final webEnabled = ref.watch(webSearchEnabledProvider);
+    final docsOnly = ref.watch(knowledgeOnlyProvider);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -83,6 +84,14 @@ class ModelPickerChip extends ConsumerWidget {
           enabled: webEnabled,
           tooltip: 'Search the web and answer from what is online',
           onTap: () => ref.read(webSearchEnabledProvider.notifier).state = !webEnabled,
+        ),
+        const SizedBox(width: 6),
+        _ToggleChip(
+          icon: Icons.menu_book_outlined,
+          label: 'Docs only',
+          enabled: docsOnly,
+          tooltip: 'Answer only from your Knowledge Base documents, with citations',
+          onTap: () => ref.read(knowledgeOnlyProvider.notifier).state = !docsOnly,
         ),
       ],
     );

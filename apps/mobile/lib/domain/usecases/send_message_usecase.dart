@@ -23,6 +23,7 @@ class SendMessageUseCase {
     List<ChatAttachment> attachments = const [],
     bool thinkingEnabled = false,
     bool webSearch = false,
+    bool knowledgeOnly = false,
     CancelToken? cancelToken,
   }) async* {
     if (provider == 'aro' && attachments.isNotEmpty && aroModel != 'auto' && aroModel != 'aro-vision') {
@@ -63,6 +64,7 @@ class SendMessageUseCase {
       apiKey: apiKey ?? '',
       thinkingEnabled: thinkingEnabled,
       webSearch: webSearch,
+      knowledgeOnly: knowledgeOnly,
       cancelToken: cancelToken,
     )) {
       switch (event.type) {
@@ -74,6 +76,7 @@ class SendMessageUseCase {
           servedBy = event.servedBy ?? servedBy;
           servedModel = event.model ?? servedModel;
         case AiStreamEventType.saved:
+        case AiStreamEventType.memory:
           break;
       }
       yield event;

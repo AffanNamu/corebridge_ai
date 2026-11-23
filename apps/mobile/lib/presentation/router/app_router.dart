@@ -14,6 +14,7 @@ import '../screens/files_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/knowledge_base_screen.dart';
+import '../screens/memory_screen.dart';
 import '../screens/plan_screen.dart';
 import '../screens/projects_screen.dart';
 import '../screens/prompt_library_screen.dart';
@@ -61,6 +62,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           // push: true items), so GoRouter gives them a real back-stack
           // entry — the system back button pops them correctly.
           GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+          GoRoute(path: '/memory', builder: (context, state) => const MemoryScreen()),
           GoRoute(path: '/api-providers', builder: (context, state) => const ApiProvidersScreen()),
           GoRoute(path: '/usage-stats', builder: (context, state) => const UsageStatsScreen()),
           GoRoute(path: '/plan', builder: (context, state) => const PlanScreen()),

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/di/providers.dart';
 import '../../core/providers/app_preferences_provider.dart';
 import '../../core/providers/selected_model_provider.dart';
@@ -283,6 +284,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: 'View and manage your data.',
                 trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                 onTap: () => _showComingSoon('Data control'),
+              ),
+              _row(
+                icon: Icons.psychology_alt_outlined,
+                label: 'Memory',
+                subtitle: 'Off unless you turn it on. Choose what ARO remembers about you across chats; see and delete everything.',
+                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                onTap: () => context.push('/memory'),
               ),
               _row(
                 icon: Icons.volunteer_activism_outlined,
