@@ -123,12 +123,19 @@ def identity_for(spec: ModelSpec) -> list[dict[str, Any]]:
 
 # ------------------------------------------------------------------ loaders
 
-def _hf(dataset_id: str, split: str, config: str | None = None):
+def _hf(dataset_id: str, split: str, config: str | None = None, take: int | None = None):
+    """Loads a registry dataset. With `take`, streams only the first rows
+    instead of downloading everything (CodeContests is several GB)."""
     from datasets import load_dataset
 
     dataset = get(dataset_id)
-    revision = dataset.version if re.fullmatch(r"[0-9a-f]{7,40}", dataset.version or "") else None
-    return load_dataset(dataset.hf_id, config, split=split, revision=revision)
+    revision = dataset.version if re.fullmatch(r"[0-9a-f]{40}", dataset.version or "") else None
+    if take is None:
+        return load_dataset(dataset.hf_id, config, split=split, revision=revision)
+    from itertools import islice
+
+    stream = load_dataset(dataset.hf_id, config, split=split, revision=revision, streaming=True)
+    return list(islice(stream, take))
 
 
 def _train_split(dataset_id: str) -> str:
@@ -145,10 +152,12 @@ def _load_gsm8k(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
 
 
 def _load_code_contests(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
-    return convert_code_contests(_hf("code-contests", _train_split("code-contests")), spec)[:limit]
+    # About half the problems have a short Python 3 solution.
+    return convert_code_contests(_hf("code-contests", _train_split("code-contests"), take=limit * 3), spec)[:limit]
 
 
 def _load_aya(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
+    # Only ~1 in 6 Aya rows is in ARO's priority languages.
     return convert_aya(_hf("aya", "train"), spec)[:limit]
 
 
@@ -157,7 +166,7 @@ def _load_smol(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
     examples: list[dict[str, Any]] = []
     for lang in TRANSLATE_LANGS:
         try:
-            rows = _hf("smol", "train", f"smolsent__en_{lang}")
+            rows = _hf("smol", "train", f"smolsent__en_{lang}", take=per_lang)
         except Exception as err:  # a language may be missing from a release
             print(f"SMOL en→{lang} unavailable: {err}")
             continue
