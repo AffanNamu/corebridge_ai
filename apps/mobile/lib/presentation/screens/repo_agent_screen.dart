@@ -257,6 +257,20 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
                 ok: !held,
                 at: at,
               ));
+            case 'verify':
+              final ok = event.data['ok'];
+              final label = event.data['label'] as String? ?? 'tests';
+              if (ok != null) {
+                _timeline.add(AgentTimelineItem(
+                  kind: 'review',
+                  text: ok == true ? 'Tests passed ($label)' : 'Tests failed ($label) — commit held back',
+                  detail: ok == true ? null : (event.data['summary'] as String? ?? '').trim(),
+                  ok: ok == true,
+                  at: at,
+                ));
+              } else {
+                _liveStatus = 'Running $label… ${event.data['summary'] ?? ''}'.trim();
+              }
             case 'confirm':
               final pending = PendingApproval.fromEvent(event.data);
               _timeline.add(AgentTimelineItem(kind: 'confirm', text: pending.summary, detail: pending.details.join('\n'), at: at));
@@ -580,6 +594,9 @@ class _TimelineTile extends StatelessWidget {
     'read_webpage': ('Read', Icons.public_rounded),
     'calculate': ('Calculated', Icons.calculate_outlined),
     'date_math': ('Worked out dates', Icons.event_outlined),
+    'run_in_sandbox': ('Ran', Icons.terminal_rounded),
+    'run_python': ('Ran Python', Icons.code_rounded),
+    'sandbox_result': ('Collected output of', Icons.terminal_rounded),
   };
 
   Future<void> _open(String? url) async {

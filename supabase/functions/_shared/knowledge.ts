@@ -13,6 +13,7 @@ import type { Db } from './db.ts';
 export const EMBEDDING_DIMS = 1024;
 const MAX_PASSAGES = 6;
 const MIN_COSINE = 0.5;
+const QUERY_EMBED_TIMEOUT_MS = 6_000;
 
 const STOPWORDS = new Set((
   'a an and are as at be been but by can could did do does for from had has have how i if in into is it its me my of on or ' +
@@ -73,20 +74,25 @@ export function embeddingsConfigured(env: (name: string) => string | undefined):
   return !!env('EMBEDDINGS_BASE_URL')?.trim();
 }
 
-/** Embeds texts (batches of 32). Null when embeddings aren't configured or the server fails. */
-export async function embedTexts(texts: string[], deps: EmbedDeps): Promise<number[][] | null> {
+/**
+ * Embeds texts (batches of 32). Null when embeddings aren't configured, the
+ * server fails, or it doesn't answer within `timeoutMs` (a scale-to-zero
+ * endpoint takes ~2 minutes to cold-start; callers fall back to keywords).
+ */
+export async function embedTexts(texts: string[], deps: EmbedDeps, timeoutMs = 110_000): Promise<number[][] | null> {
   const base = deps.env('EMBEDDINGS_BASE_URL')?.trim().replace(/\/+$/, '');
   if (!base || !texts.length) return null;
   const key = deps.env('EMBEDDINGS_API_KEY')?.trim() || deps.env('ARO_MODEL_API_KEY')?.trim() || '';
   const model = deps.env('EMBEDDINGS_MODEL')?.trim() || 'BAAI/bge-m3';
   const out: number[][] = [];
+  const signal = AbortSignal.timeout(timeoutMs);
   try {
     for (let i = 0; i < texts.length; i += 32) {
       const res = await (deps.fetchImpl ?? fetch)(`${base}/embeddings`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
         body: JSON.stringify({ model, input: texts.slice(i, i + 32) }),
-        signal: AbortSignal.timeout(60_000),
+        signal,
       });
       if (!res.ok) throw new Error(`embeddings server error (${res.status})`);
       const data = await res.json();
@@ -152,7 +158,8 @@ export async function retrieve(
   const stats = await db.rpc<{ documents: number; embedded: number }>('aro_kb_stats', { p_user: userId });
   if (!stats?.documents) return { documents: 0, passages: [], searched: false };
   const terms = searchTerms(query);
-  const vector = stats.embedded > 0 ? (await embedTexts([query.slice(0, 2_000)], deps))?.[0] : undefined;
+  // A chat reply never waits for an embedding cold start: keywords are used if it takes longer.
+  const vector = stats.embedded > 0 ? (await embedTexts([query.slice(0, 2_000)], deps, QUERY_EMBED_TIMEOUT_MS))?.[0] : undefined;
   if (!terms.length && !vector) return { documents: stats.documents, passages: [], searched: true };
   const rows = await db.rpc<{ doc_id: string; title: string; ord: number; content: string; cosine: number | null }[]>('aro_kb_search', {
     p_user: userId,

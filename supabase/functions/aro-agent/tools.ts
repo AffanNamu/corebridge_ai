@@ -7,6 +7,9 @@ import type { ToolCall, ToolDefinition, ToolResult } from '../_shared/llm/tool_c
 import { CALC_TOOLS, runCalcTool } from '../_shared/calc.ts';
 import { type JsonSchema, validate } from '../_shared/schema.ts';
 import { readPage, type WebDeps, webSearch } from '../_shared/web.ts';
+import {
+  formatResult, isJobId, runSandbox, type SandboxDeps, SandboxError, type SandboxInput, type SandboxOutcome, sandboxResult, toolchainsFor,
+} from '../_shared/sandbox.ts';
 import { PLAN_TOOL, planFromArgs } from './plan.ts';
 import type { AgentState } from './state.ts';
 
@@ -99,7 +102,72 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   PLAN_TOOL,
 ];
 
-const TOOLS_BY_NAME = new Map(TOOL_DEFINITIONS.map((t) => [t.name, t]));
+/** Real execution (only offered when the sandbox is configured). */
+export const SANDBOX_TOOLS: ToolDefinition[] = [
+  {
+    name: 'run_in_sandbox',
+    description:
+      'Run a shell command in an isolated Linux sandbox containing this repository at the working branch PLUS your staged ' +
+      'changes (Python 3.12, pip, git, gcc/make; Node 22 and Go are installed automatically when the command uses them). ' +
+      'Use it to run tests, linters, type checkers or a build before committing, e.g. "npm ci && npm test" or ' +
+      '"pip install -r requirements.txt && pytest -q". Returns the exit code and output. No secrets are available; ' +
+      'internet access is for installing packages.',
+    parameters: {
+      type: 'object',
+      properties: {
+        command: { type: 'string', minLength: 1, maxLength: 2000 },
+        timeout_seconds: { type: 'integer', minimum: 10, maximum: 300 },
+      },
+      required: ['command'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'run_python',
+    description: 'Run a Python 3.12 script in an isolated sandbox (no repository) and return its output. ' +
+      'Use it for data processing or heavy maths that calculate cannot do.',
+    parameters: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', minLength: 1, maxLength: 20000 },
+        timeout_seconds: { type: 'integer', minimum: 10, maximum: 300 },
+      },
+      required: ['code'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'sandbox_result',
+    description: 'Get the output of a sandbox job that was still running when its tool call returned.',
+    parameters: {
+      type: 'object',
+      properties: { job_id: { type: 'string', pattern: '^[A-Za-z0-9-]{8,80}$' } },
+      required: ['job_id'],
+      additionalProperties: false,
+    },
+  },
+];
+
+export function toolDefinitions(options: { sandbox: boolean }): ToolDefinition[] {
+  return options.sandbox ? [...TOOL_DEFINITIONS, ...SANDBOX_TOOLS] : TOOL_DEFINITIONS;
+}
+
+const TOOLS_BY_NAME = new Map([...TOOL_DEFINITIONS, ...SANDBOX_TOOLS].map((t) => [t.name, t]));
+/** Sandbox jobs per request (each one is billed CPU time). */
+export const MAX_SANDBOX_RUNS = 6;
+const MAX_SANDBOX_FILE_BYTES = 6 * 1024 * 1024;
+
+export interface TestPlan {
+  command: string;
+  toolchains: ('node' | 'go')[];
+  /** e.g. "npm test", shown to the user. */
+  label: string;
+}
+
+export interface SandboxSetup extends SandboxDeps {
+  /** Epoch ms by which a tool call must return (the run's time budget). */
+  deadline: () => number;
+}
 
 /** Tools that only read: safe to retry automatically on a transient GitHub/network error. */
 const READ_ONLY = new Set(['list_files', 'read_file', 'search_code', 'get_ci_status', 'web_search', 'read_webpage']);
@@ -124,16 +192,24 @@ export type ToolEvent =
   | { type: 'pull_request'; number: number; url: string }
   | { type: 'plan'; plan: AgentState['plan'] };
 
+export type SandboxRun = { outcome: SandboxOutcome; text: string };
+
 export class ToolRunner {
   private tree: TreeEntry[] | null = null;
   private treeTruncated = false;
+  private sandboxRuns = 0;
 
   constructor(
     private readonly github: GitHubClient,
     private readonly state: AgentState,
     private readonly emit: (event: ToolEvent) => void,
     private readonly web?: WebDeps,
+    private readonly sandbox?: SandboxSetup,
   ) {}
+
+  get sandboxEnabled(): boolean {
+    return !!this.sandbox;
+  }
 
   /** The ref to read from: the working branch once it exists on GitHub. */
   private get readRef(): string {
@@ -246,6 +322,12 @@ export class ToolRunner {
       case 'calculate':
       case 'date_math':
         return runCalcTool(call.name, args);
+      case 'run_in_sandbox':
+        return (await this.runCommand(requireString(args, 'command'), optionalInt(args.timeout_seconds) ?? 120)).text;
+      case 'run_python':
+        return (await this.runSandboxJob({ mode: 'python', code: requireString(args, 'code'), timeout_seconds: optionalInt(args.timeout_seconds) ?? 60 }, 'The script')).text;
+      case 'sandbox_result':
+        return (await this.collect(requireString(args, 'job_id'))).text;
       case 'set_plan': {
         this.state.plan = planFromArgs(args);
         this.state.planStale = false;
@@ -256,6 +338,97 @@ export class ToolRunner {
       default:
         throw new Error(`Unknown tool: ${call.name}`);
     }
+  }
+
+  /** Runs a command in the sandbox on the working branch plus the staged changes. */
+  async runCommand(command: string, timeoutSeconds: number, label = 'The command'): Promise<SandboxRun> {
+    const files = { ...this.state.pending };
+    if (Object.values(files).reduce((n, c) => n + (c?.length ?? 0), 0) > MAX_SANDBOX_FILE_BYTES) {
+      throw new Error('The staged changes are too large to send to the sandbox (6 MB max). Commit some first.');
+    }
+    const repoUrl = await this.github.tarballUrl(this.readRef);
+    return await this.runSandboxJob(
+      { mode: 'repo', repo_url: repoUrl, files, command, toolchains: toolchainsFor(command), timeout_seconds: Math.min(Math.max(timeoutSeconds, 10), 300) },
+      label,
+    );
+  }
+
+  private remainingWait(): number {
+    // Leave time to report back before the request's time budget ends.
+    return Math.max(0, Math.min(100_000, this.sandbox!.deadline() - (this.sandbox!.now ?? Date.now)() - 15_000));
+  }
+
+  private async runSandboxJob(input: SandboxInput, label: string): Promise<SandboxRun> {
+    if (!this.sandbox) throw new Error('Code execution is not available here.');
+    if (this.sandboxRuns >= MAX_SANDBOX_RUNS) {
+      throw new Error(`Sandbox limit reached for this run (${MAX_SANDBOX_RUNS} jobs). Continue in the next step if more are needed.`);
+    }
+    this.sandboxRuns++;
+    try {
+      const outcome = await runSandbox(input, this.sandbox, this.remainingWait());
+      this.state.sandboxJobs = [...(this.state.sandboxJobs ?? []), outcome.jobId].slice(-20);
+      return { outcome, text: this.describe(outcome, label) };
+    } catch (err) {
+      throw err instanceof SandboxError ? new Error(err.message) : err;
+    }
+  }
+
+  /** Collects a job started earlier in this session (and only those). */
+  async collect(jobId: string): Promise<SandboxRun> {
+    if (!this.sandbox) throw new Error('Code execution is not available here.');
+    if (!isJobId(jobId) || !(this.state.sandboxJobs ?? []).includes(jobId)) throw new Error(`Unknown sandbox job "${jobId}".`);
+    try {
+      const outcome = await sandboxResult(jobId, this.sandbox, this.remainingWait());
+      // The pre-commit test job finished: remember whether these changes passed.
+      if (outcome.state === 'done' && this.state.verified?.jobId === jobId) {
+        const passed = outcome.result.exit_code === 0 && !outcome.result.timed_out;
+        this.state.verified = passed ? { hash: this.state.verified.hash, passed: true } : undefined;
+      }
+      return { outcome, text: this.describe(outcome, 'The job') };
+    } catch (err) {
+      throw err instanceof SandboxError ? new Error(err.message) : err;
+    }
+  }
+
+  private describe(outcome: SandboxOutcome, label: string): string {
+    return outcome.state === 'done'
+      ? formatResult(outcome.result, label)
+      : `${label} is still running in the sandbox (job ${outcome.jobId}). Call sandbox_result with job_id "${outcome.jobId}" to get the output.`;
+  }
+
+  /**
+   * The repository's test command, if it has a standard one (checked at the
+   * repository root, including staged changes): npm/yarn/pnpm "test" script,
+   * pytest, or Go tests.
+   */
+  async detectTests(): Promise<TestPlan | null> {
+    const files = new Set((await this.loadTree()).filter((e) => e.type === 'blob').map((e) => e.path));
+    for (const [path, content] of Object.entries(this.state.pending)) content === null ? files.delete(path) : files.add(path);
+    if (files.has('package.json')) {
+      try {
+        const pkg = JSON.parse((await this.currentText('package.json')) ?? '{}');
+        const test = typeof pkg.scripts?.test === 'string' ? pkg.scripts.test : '';
+        if (test && !/no test specified/i.test(test)) {
+          const corepack = 'corepack enable --install-directory "$HOME/.local/bin"';
+          if (files.has('pnpm-lock.yaml')) return { command: `${corepack} && pnpm install --frozen-lockfile && pnpm test`, toolchains: ['node'], label: 'pnpm test' };
+          if (files.has('yarn.lock')) return { command: `${corepack} && yarn install && yarn test`, toolchains: ['node'], label: 'yarn test' };
+          const install = files.has('package-lock.json') ? 'npm ci --no-audit --no-fund' : 'npm install --no-audit --no-fund';
+          return { command: `${install} && npm test`, toolchains: ['node'], label: 'npm test' };
+        }
+      } catch { /* not valid JSON: no npm tests */ }
+    }
+    const pyTests = [...files].some((f) => /(^|\/)(test_[^/]+|[^/]+_test)\.py$/.test(f));
+    const pyConfig = files.has('pytest.ini') || files.has('conftest.py') ||
+      (files.has('pyproject.toml') && /\[tool\.pytest/.test((await this.currentText('pyproject.toml')) ?? ''));
+    if (pyTests || pyConfig) {
+      const steps = ['python3 -m venv .venv', '. .venv/bin/activate', 'pip install -q pytest'];
+      if (files.has('requirements.txt')) steps.push('pip install -q -r requirements.txt');
+      if (files.has('pyproject.toml') || files.has('setup.py')) steps.push('(pip install -q -e . || true)');
+      steps.push('python -m pytest -q -x');
+      return { command: steps.join(' && '), toolchains: [], label: 'pytest' };
+    }
+    if (files.has('go.mod')) return { command: 'go test ./...', toolchains: ['go'], label: 'go test' };
+    return null;
   }
 
   private async webSearch(query: string): Promise<string> {
@@ -392,6 +565,8 @@ export class ToolRunner {
     const commit = await this.github.commitChanges(this.state.workBranch, message, changes, modes);
     this.state.pending = {};
     this.state.reviewRejections = 0;
+    this.state.testFailures = 0;
+    this.state.verified = undefined;
     this.tree = null;
     this.state.commits.push({ sha: commit.sha, url: commit.url, message, files: paths });
     this.emit({ type: 'commit', ...commit, branch: this.state.workBranch, message, files: paths });

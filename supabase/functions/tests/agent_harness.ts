@@ -53,6 +53,11 @@ export function githubFetch(repo: FakeRepo, onModel: (body: any) => any) {
         truncated: false,
       });
     }
+    m = path.match(/^\/tarball\/(.+)$/);
+    if (m && method === 'GET') {
+      // GitHub redirects to codeload with a short-lived token (the user's PAT is never in the URL).
+      return new Response(null, { status: 302, headers: { location: `https://codeload.example/acme/app/tar.gz/${m[1]}?token=SHORTLIVED` } });
+    }
     m = path.match(/^\/contents\/(.+)$/);
     if (m) {
       const ref = url.searchParams.get('ref')!;

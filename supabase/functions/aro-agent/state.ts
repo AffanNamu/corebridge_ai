@@ -31,6 +31,12 @@ export interface AgentState {
   planStale?: boolean;
   /** Commits held back by the reviewer since the last successful commit. */
   reviewRejections?: number;
+  /** Sandbox jobs this session started (sandbox_result only collects these). */
+  sandboxJobs?: string[];
+  /** Commits held back because the tests failed, since the last successful commit. */
+  testFailures?: number;
+  /** The staged changes whose tests passed (hash), or a test job still running for them. */
+  verified?: { hash: string; jobId?: string; passed: boolean };
 }
 
 export interface PendingConfirmation {
@@ -124,6 +130,11 @@ export function parseState(raw: unknown): AgentState | string {
     plan: parsePlan(s.plan),
     planStale: s.planStale === true,
     reviewRejections: Number.isInteger(s.reviewRejections) && (s.reviewRejections as number) >= 0 ? s.reviewRejections : 0,
+    sandboxJobs: Array.isArray(s.sandboxJobs) ? s.sandboxJobs.filter((j) => typeof j === 'string').slice(-20) : [],
+    testFailures: Number.isInteger(s.testFailures) && (s.testFailures as number) >= 0 ? s.testFailures : 0,
+    verified: s.verified && typeof s.verified.hash === 'string'
+      ? { hash: s.verified.hash, passed: s.verified.passed === true, ...(typeof s.verified.jobId === 'string' ? { jobId: s.verified.jobId } : {}) }
+      : undefined,
   };
 }
 

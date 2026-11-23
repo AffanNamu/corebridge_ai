@@ -84,6 +84,28 @@ export class GitHubClient {
     return `/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}${suffix}`;
   }
 
+  /**
+   * A short-lived download URL for the repository at `ref` (GitHub redirects
+   * /tarball to codeload with a temporary token that expires in minutes), so
+   * the sandbox can fetch the code without ever seeing the user's token.
+   */
+  async tarballUrl(ref: string): Promise<string> {
+    const response = await this.fetchImpl(`${API}${this.repoPath(`/tarball/${encodeURIComponent(ref)}`)}`, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'aro-ai-agent',
+      },
+    });
+    await response.body?.cancel().catch(() => {});
+    const location = response.headers.get('location');
+    if (response.status >= 300 && response.status < 400 && location?.startsWith('https://')) return location;
+    throw new GitHubError(`GitHub GET /tarball failed (${response.status})`, response.status);
+  }
+
   async getRepo(): Promise<{ defaultBranch: string; private: boolean; canPush: boolean }> {
     const data = await this.json('GET', this.repoPath(''));
     return {
