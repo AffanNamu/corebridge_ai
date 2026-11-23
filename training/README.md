@@ -55,7 +55,35 @@ supabase secrets set ARO_MODEL_BASE_URL=https://<printed>.trycloudflare.com/v1 \
 
 Colab sessions end after a few hours, and the URL changes every session. Set the backup model secrets too (`ARO_FALLBACK_BASE_URL`, `ARO_FALLBACK_API_KEY`, `ARO_FALLBACK_MODEL`) so chat keeps working while ARO is offline. Backup answers are labelled in the app and never used for training.
 
-## Run it every day (production)
+## Run it on RunPod (one command)
+
+Create a pod:
+- **GPU** with 24 GB or more (RTX 4090, A5000, L4, A10…)
+- any PyTorch template
+- **volume disk** of 80 GB or more
+- **HTTP port 8000** exposed (*Edit Pod → Expose HTTP Ports*)
+
+Then run this in the pod's web terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AffanNamu/corebridge_ai/aro-ai-v1/training/scripts/runpod_train.sh -o /workspace/aro_train.sh && bash /workspace/aro_train.sh
+```
+
+The script runs in the background, so it survives closing the terminal. It:
+1. builds the license-gated training data
+2. trains ARO 1.5, Code, Research and Translate
+3. evaluates each against the current version and keeps only the winners
+4. serves them on port 8000
+
+Progress is at `https://<POD_ID>-8000.proxy.runpod.net/status.json`, or with `tail -f /workspace/aro/run.log` in the pod. On an RTX 4090 a full first run takes about 3–5 hours.
+
+When it's done:
+1. Put `https://<POD_ID>-8000.proxy.runpod.net/v1` in the Supabase secret `ARO_MODEL_BASE_URL`.
+2. Put the key printed by `cat /workspace/aro/api_key` in `ARO_MODEL_API_KEY`.
+
+Everything stays on the pod's volume, so re-running the command later starts a new training run and keeps the current versions.
+
+
 
 Rent a GPU with 24 GB, for example an RTX 4090 on RunPod or Vast.ai (about $0.30–0.70/hour). Then:
 
