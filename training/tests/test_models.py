@@ -120,7 +120,7 @@ def test_prepare_model_end_to_end_offline(tmp_path, monkeypatch):
     assert n == len(train) > 20 - 1
     assert not any(leaked_prompt in e["messages"][1]["content"] for e in train), "test question leaked into training"
     manifest = json.loads((tmp_path / "aro-translate" / "train.jsonl.manifest.json").read_text())
-    assert {s["id"] for s in manifest["sources"]} == {"smol", "aro-identity"}
+    assert {s["id"] for s in manifest["sources"]} == {"smol", "aro-identity", "aro-web-grounding"}
     assert manifest["model"] == "aro-translate"
     # Second run with no new feedback: nothing to train.
     assert prepare.prepare_model(model, [], tmp_path) == 0
@@ -230,3 +230,30 @@ def test_evaluation_runs_in_parallel_keeps_order_and_can_compare_two_servers(mon
     assert [r.id for r in decision.items] == ids
     assert peak > 1, "requests overlap so vLLM can batch them"
     assert {("http://new/v1", "cand"), ("http://old/v1", "curr")} == set(calls)
+
+
+def test_web_grounded_examples_match_what_the_server_sends():
+    import re as _re
+
+    from aro_training.clean import clean
+    from aro_training.config import WEB_INSTRUCTIONS, WEB_SEARCH_FAILED
+    from aro_training.sources import web_grounded_for
+
+    web_ts = (ROOT / "supabase/functions/_shared/web.ts").read_text()
+    m = _re.search(r"export const WEB_INSTRUCTIONS =([^;]+);", web_ts)
+    assert m, "WEB_INSTRUCTIONS not found in web.ts"
+    pieces = _re.findall(r"'([^']*)'|\"([^\"]*)\"", m.group(1))
+    assert "".join(a or b for a, b in pieces) == WEB_INSTRUCTIONS
+    router = (ROOT / "supabase/functions/ai-router/handler.ts").read_text()
+    assert " ".join(_re.findall(r"'([^']*)'", router[router.index("but the web search failed just now") - 80:][:400]))[:60] in WEB_SEARCH_FAILED
+
+    for model_id in ["aro-1.5", "aro-code", "aro-research"]:
+        examples = web_grounded_for(spec(model_id))
+        assert len(examples) >= 10
+        assert len(clean(examples)) == len(examples), "every web example survives cleaning"
+        for e in examples:
+            system, answer = e["messages"][0]["content"], e["messages"][-1]["content"]
+            assert system.startswith(spec(model_id).system_prompt)
+            assert "http" not in answer, "answers cite [n]; the server appends the links"
+            if "Search:" in system:
+                assert _re.search(r"\[\d\]", answer), answer[:80]

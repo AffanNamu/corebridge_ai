@@ -20,6 +20,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 |---|---|---|---|---|---|
 | [ARO identity seed](../../training/seed/identity.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha, fr | Teaches every text model that it is an ARO model. |
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
+| [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
 | [Aya Dataset](https://huggingface.co/datasets/CohereLabs/aya_dataset) | ✅ allowed | train | apache-2.0 | multi, ha, ig, yo, sw, am, wo, xh… | Key source for African-language conversation. |
 | [GSM8K](https://huggingface.co/datasets/openai/gsm8k) | ✅ allowed | train, eval | mit | en | Train split for ARO Research; test split for evaluation only. |
 | [OpenAssistant Conversations (oasst1)](https://huggingface.co/datasets/OpenAssistant/oasst1) | ✅ allowed | train | apache-2.0 | en, es, fr, de, pt, ru, zh | Superseded by oasst2 (which includes it). |
@@ -40,6 +41,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 |---|---|---|---|---|---|
 | [ARO identity seed](../../training/seed/identity.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha, fr | Teaches every text model that it is an ARO model. |
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
+| [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
 | [CodeContests](https://huggingface.co/datasets/deepmind/code_contests) | ✅ allowed | train, eval | cc-by-4.0 | en, code | Train split for ARO Code; test split kept for evaluation only. |
 | [OpenAssistant Conversations (oasst2)](https://huggingface.co/datasets/OpenAssistant/oasst2) | ✅ allowed | train | apache-2.0 | en, es, fr, de, pt, ru, zh, multi | ARO 1.5 starter data (aro_training.bootstrap). |
 | [CommitPack](https://huggingface.co/datasets/bigcode/commitpack) | 🟡 conditional | train-after-review | mit (dataset) + per-repo permissive licenses | code, en | Good for 'fix this code' style data (CommitPackFT subset). |
@@ -58,6 +60,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 |---|---|---|---|---|---|
 | [ARO identity seed](../../training/seed/identity.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha, fr | Teaches every text model that it is an ARO model. |
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
+| [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
 | [CodeContests](https://huggingface.co/datasets/deepmind/code_contests) | ✅ allowed | train, eval | cc-by-4.0 | en, code | Train split for ARO Code; test split kept for evaluation only. |
 | [GSM8K](https://huggingface.co/datasets/openai/gsm8k) | ✅ allowed | train, eval | mit | en | Train split for ARO Research; test split for evaluation only. |
 | [OpenWebMath](https://huggingface.co/datasets/open-web-math/open-web-math) | 🟡 conditional | pretrain | unspecified on hub (web content) | en | No license tag on the hub; underlying web pages keep their copyright. |
@@ -120,6 +123,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 |---|---|---|---|---|---|
 | [ARO identity seed](../../training/seed/identity.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha, fr | Teaches every text model that it is an ARO model. |
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
+| [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
 | [AfriBERTa Corpus](https://huggingface.co/datasets/castorini/afriberta-corpus) | ✅ allowed | pretrain, train | apache-2.0 | ha, yo, ig, pcm, sw, am, so, om… | Monolingual text — language identification and fluency. |
 | [Aya Dataset](https://huggingface.co/datasets/CohereLabs/aya_dataset) | ✅ allowed | train | apache-2.0 | multi, ha, ig, yo, sw, am, wo, xh… | Key source for African-language conversation. |
 | [FLEURS](https://huggingface.co/datasets/google/fleurs) | ✅ allowed | train, eval | cc-by-4.0 | multi, ha, yo, ig, sw, am, ar, zu… |  |

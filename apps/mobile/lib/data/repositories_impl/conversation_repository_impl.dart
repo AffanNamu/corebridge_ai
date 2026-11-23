@@ -147,6 +147,7 @@ class ConversationRepositoryImpl implements ConversationRepository {
     required List<ChatAttachment> attachments,
     required String apiKey,
     bool thinkingEnabled = false,
+    bool webSearch = false,
     CancelToken? cancelToken,
   }) {
     // `model` is already vision-capable when there are attachments — see
@@ -163,6 +164,7 @@ class ConversationRepositoryImpl implements ConversationRepository {
       messages: messages,
       apiKey: apiKey,
       thinkingEnabled: thinkingEnabled,
+      webSearch: webSearch,
       cancelToken: cancelToken,
     );
   }

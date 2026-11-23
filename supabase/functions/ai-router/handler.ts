@@ -39,13 +39,24 @@ import {
   type Usage,
 } from '../_shared/cost.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
+import {
+  formatResults,
+  type Page,
+  readPage,
+  searchQueryFrom,
+  type SearchResult,
+  sourcesMarkdown,
+  WEB_INSTRUCTIONS,
+  wantsWeb,
+  webSearch,
+} from '../_shared/web.ts';
 import { isAdmin, overview, refund } from '../_shared/entitlements.ts';
 import type { VerifiedUser } from '../_shared/firebase-auth.ts';
 import { CORS_HEADERS, jsonResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
 import { streamChat } from '../_shared/llm/chat_stream.ts';
 import { Capability, listModels } from '../_shared/llm/list_models.ts';
 import { resolveEndpoints } from '../_shared/llm/providers.ts';
-import { type ChatMessage, type ContentPart, type Endpoint, isProviderId, ProviderError } from '../_shared/llm/types.ts';
+import { type ChatMessage, type ContentPart, type Endpoint, isProviderId, ProviderError, textOf } from '../_shared/llm/types.ts';
 
 export interface RouterDeps {
   verify: (req: Request) => Promise<VerifiedUser | null>;
@@ -61,6 +72,9 @@ const DEFAULT_ARO_MAX_TOKENS = 2048;
 /** Room kept for the chat template and tokenizer differences. */
 const CONTEXT_MARGIN_TOKENS = 256;
 const MAX_CACHED_ANSWER_CHARS = 20_000;
+/** Room kept in ARO's context for web results (~12k characters). */
+const WEB_CONTEXT_TOKENS = 4_500;
+const PAGES_TO_READ = 2;
 
 function errorResponse(message: string, status: number, retryAfter?: number): Response {
   const response = jsonResponse({ error: message }, status);
@@ -138,12 +152,18 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
     : messages;
   const thinking = body.thinkingEnabled === true;
 
+  // Web mode: the user turned on "Web", or asked to search online / not to rely on training.
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const lastUserText = lastUser ? textOf(lastUser.content) : '';
+  const web = body.webSearch === true || (body.webSearch !== false && wantsWeb(lastUserText));
+
   // ARO: cap the answer length by plan and keep the conversation inside the context window.
   let maxTokens: number | undefined;
   let trimmed = 0;
   if (aro) {
     maxTokens = limits.max_output_tokens ?? DEFAULT_ARO_MAX_TOKENS;
-    const fit = fitToContext(finalMessages, aroContextTokens(env) - maxTokens - CONTEXT_MARGIN_TOKENS);
+    const webRoom = web ? WEB_CONTEXT_TOKENS : 0;
+    const fit = fitToContext(finalMessages, aroContextTokens(env) - maxTokens - CONTEXT_MARGIN_TOKENS - webRoom);
     finalMessages = fit.messages;
     trimmed = fit.droppedMessages + (fit.truncated ? 1 : 0);
   }
@@ -166,7 +186,7 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
     }
     : { traceId };
 
-  const useCache = aro !== undefined && body.cache !== false && cacheable(finalMessages, thinking);
+  const useCache = aro !== undefined && !web && body.cache !== false && cacheable(finalMessages, thinking);
   const key = useCache ? await cacheKey(`${aro!.aroModel}\n${aro!.systemPrompt}`, finalMessages) : '';
   const logBase = {
     traceId, userId: user.uid, surface: 'chat' as const, provider, aroModel: aro?.aroModel,
@@ -189,6 +209,20 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
           return;
         }
 
+        let sources: SearchResult[] = [];
+        if (web) {
+          controller.enqueue(sseFrame({ status: 'Searching the web…' }));
+          const found = await webContext(lastUserText, finalMessages, endpoints, env, deps.fetchImpl);
+          sources = found.results;
+          controller.enqueue(sseFrame({ status: found.status, web: { query: found.query, sources } }));
+          metaExtra.web = { query: found.query, provider: found.provider, sources: sources.map(({ title, url }) => ({ title, url })) };
+          // One system message (Qwen/ARO's chat template expects it first and only once).
+          const sys = finalMessages.findIndex((m) => m.role === 'system' && typeof m.content === 'string');
+          finalMessages = sys >= 0
+            ? finalMessages.map((m, i) => (i === sys ? { ...m, content: `${m.content}\n\n${found.block}` } : m))
+            : [{ role: 'system', content: found.block }, ...finalMessages];
+        }
+
         let answer = '';
         const result = await streamWithFallback(endpoints, finalMessages, thinking, deps.fetchImpl, (frame) => {
           answered = true;
@@ -199,6 +233,7 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
         });
         served = result.endpoint;
         usage = result.usage;
+        if (sources.length) controller.enqueue(sseFrame({ delta: sourcesMarkdown(sources) }));
         await logUsage(db, { ...logBase, model: served.model, servedBy: served.servedBy, usage, latencyMs: Date.now() - started }, env, deps.fetchImpl);
         if (useCache && served.servedBy === 'aro' && answer.trim() && answer.length <= MAX_CACHED_ANSWER_CHARS) {
           await cachePut(db, key, aro!.aroModel, answer);
@@ -273,6 +308,84 @@ export async function streamWithFallback(
     }
   }
   throw lastError;
+}
+
+interface WebContext {
+  query: string;
+  provider: string;
+  results: SearchResult[];
+  block: string;
+  status: string;
+}
+
+/**
+ * Searches the web for the user's request and reads the top pages. Never
+ * throws: if the web can't be reached, the model is told so and answers
+ * from its own knowledge, saying that it couldn't search.
+ */
+export async function webContext(
+  lastUserText: string,
+  messages: ChatMessage[],
+  endpoints: Endpoint[],
+  env: (name: string) => string | undefined,
+  fetchImpl?: typeof fetch,
+): Promise<WebContext> {
+  const query = await searchQuery(lastUserText, messages, endpoints, fetchImpl);
+  try {
+    const { provider, results } = await webSearch(query, { env, fetchImpl }, 5);
+    if (!results.length) {
+      return {
+        query, provider, results,
+        block: `${WEB_INSTRUCTIONS}\n\nWeb search for "${query}" returned no results. Tell the user, then answer from your own knowledge and say so.`,
+        status: 'No web results found',
+      };
+    }
+    const pages = (await Promise.allSettled(
+      results.slice(0, PAGES_TO_READ).map((r) => readPage(r.url, { env, fetchImpl }, 5_000)),
+    )).flatMap((p) => (p.status === 'fulfilled' ? [p.value] : [])) as Page[];
+    return {
+      query, provider, results,
+      block: `${WEB_INSTRUCTIONS}\n\nSearch: "${query}"\n\n${formatResults(results, pages)}`,
+      status: `Read ${results.length} web results`,
+    };
+  } catch (err) {
+    console.warn('web search failed:', err instanceof Error ? err.message : err);
+    return {
+      query, provider: 'none', results: [],
+      block: 'The user asked for an answer based on a web search, but the web search failed just now. ' +
+        'Tell them you could not search the web this time, then answer from your own knowledge and say so clearly.',
+      status: "Couldn't reach the web",
+    };
+  }
+}
+
+/** The search query: the user's words, or (for follow-ups like "search it online") a query written by the model. */
+async function searchQuery(
+  text: string,
+  messages: ChatMessage[],
+  endpoints: Endpoint[],
+  fetchImpl?: typeof fetch,
+): Promise<string> {
+  const heuristic = searchQueryFrom(text);
+  const earlier = messages.filter((m) => m.role === 'user').length > 1;
+  const vague = heuristic.split(/\s+/).length < 4 || /\b(it|this|that|these|those|above|the (error|issue|problem|bug))\b/i.test(heuristic);
+  if (!earlier || !vague) return heuristic;
+  try {
+    const recent = messages.filter((m) => m.role !== 'system').slice(-6)
+      .map((m) => `${m.role}: ${textOf(m.content).slice(0, 1_500)}`).join('\n');
+    let out = '';
+    const ask: ChatMessage[] = [
+      { role: 'system', content: 'Write ONE web search query (at most 12 words) that finds what the user needs. Reply with the query only.' },
+      { role: 'user', content: `Conversation:\n${recent}\n\nSearch query:` },
+    ];
+    for await (const event of streamChat(endpoints[0], ask, { maxTokens: 40, fetchImpl })) {
+      if (event.type === 'content') out += event.text;
+    }
+    out = out.replace(/^["'`\s]+|["'`\s]+$/g, '').split('\n')[0].slice(0, 200);
+    return out.length >= 3 ? out : heuristic;
+  } catch {
+    return heuristic;
+  }
 }
 
 export function parseMessages(raw: unknown): ChatMessage[] | string {

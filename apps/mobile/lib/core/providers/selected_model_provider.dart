@@ -40,6 +40,10 @@ final selectedModelProvider = StateProvider<AiModelOption>((ref) => availableMod
 
 final thinkingModeEnabledProvider = StateProvider<bool>((ref) => false);
 
+/// "Web": answer from a live web search instead of training data only.
+/// Off still lets the server search when the message asks for it ("search online…").
+final webSearchEnabledProvider = StateProvider<bool>((ref) => false);
+
 final draftMessageProvider = StateProvider<String>((ref) => '');
 
 /// Guards against re-applying the user's saved default provider every

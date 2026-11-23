@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/message_entity.dart';
 import 'artifact_viewer_sheet.dart';
@@ -221,8 +222,16 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
       child: MarkdownBody(
         data: text,
         selectable: true,
+        // Web-search sources and other links open in the browser (http/https only).
+        onTapLink: (_, href, __) {
+          final uri = href == null ? null : Uri.tryParse(href);
+          if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+            launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
         styleSheet: MarkdownStyleSheet(
           p: TextStyle(color: isUser ? Colors.white : (widget.isError ? Colors.redAccent.shade100 : AppColors.textPrimary), fontSize: 15, height: 1.4),
+          a: const TextStyle(color: AppColors.accentBlue, decoration: TextDecoration.underline),
           strong: TextStyle(color: isUser ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w700),
           code: const TextStyle(backgroundColor: Colors.black26, fontFamily: 'monospace', fontSize: 13),
         ),

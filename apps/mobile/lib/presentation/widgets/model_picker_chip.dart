@@ -10,6 +10,7 @@ class ModelPickerChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(selectedModelProvider);
     final thinkingEnabled = ref.watch(thinkingModeEnabledProvider);
+    final webEnabled = ref.watch(webSearchEnabledProvider);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -75,7 +76,52 @@ class ModelPickerChip extends ConsumerWidget {
             ),
           ),
         ],
+        const SizedBox(width: 6),
+        _ToggleChip(
+          icon: Icons.travel_explore_outlined,
+          label: 'Web',
+          enabled: webEnabled,
+          tooltip: 'Search the web and answer from what is online',
+          onTap: () => ref.read(webSearchEnabledProvider.notifier).state = !webEnabled,
+        ),
       ],
+    );
+  }
+}
+
+class _ToggleChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ToggleChip({required this.icon, required this.label, required this.enabled, required this.tooltip, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled ? AppColors.accentBlue : AppColors.textMuted;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: enabled ? AppColors.accentBlue.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: enabled ? FontWeight.w600 : FontWeight.w400)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -22,6 +22,7 @@ class SendMessageUseCase {
     String? aroModel,
     List<ChatAttachment> attachments = const [],
     bool thinkingEnabled = false,
+    bool webSearch = false,
     CancelToken? cancelToken,
   }) async* {
     if (provider == 'aro' && attachments.isNotEmpty && aroModel != 'auto' && aroModel != 'aro-vision') {
@@ -61,6 +62,7 @@ class SendMessageUseCase {
       attachments: attachments,
       apiKey: apiKey ?? '',
       thinkingEnabled: thinkingEnabled,
+      webSearch: webSearch,
       cancelToken: cancelToken,
     )) {
       switch (event.type) {

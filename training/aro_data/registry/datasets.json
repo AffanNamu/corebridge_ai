@@ -1925,6 +1925,37 @@
       "notes": "Teaches every text model that it is an ARO model."
     },
     {
+      "id": "aro-web-grounding",
+      "name": "ARO web-grounded answers seed",
+      "publisher": "ARO AI",
+      "source_url": "training/seed/web_grounded.jsonl",
+      "hf_id": null,
+      "version": "pin at download (release/date)",
+      "download_method": "repo",
+      "size": "12 examples",
+      "format": "",
+      "languages": [
+        "en",
+        "ha"
+      ],
+      "license": "proprietary (ARO AI)",
+      "license_checked": "owned by ARO AI",
+      "commercial_status": "allowed",
+      "usage": [
+        "train"
+      ],
+      "redistribution": "",
+      "attribution": "",
+      "quality": "hand-written",
+      "models": [
+        "aro-1.5",
+        "aro-code",
+        "aro-research",
+        "aro-translate"
+      ],
+      "notes": "Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned."
+    },
+    {
       "id": "aro-user-feedback",
       "name": "ARO user feedback",
       "publisher": "ARO AI users (opt-in)",

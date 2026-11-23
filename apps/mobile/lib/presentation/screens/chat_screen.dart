@@ -131,6 +131,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final selectedModel = ref.read(selectedModelProvider);
     final thinkingEnabled = selectedModel.supportsThinking && ref.read(thinkingModeEnabledProvider);
+    final webSearch = ref.read(webSearchEnabledProvider);
 
     if (_conversationId == null) {
       if (_conversationCreation != null) {
@@ -204,6 +205,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         aroModel: selectedModel.aroModel,
         attachments: attachments,
         thinkingEnabled: thinkingEnabled,
+        webSearch: webSearch,
         cancelToken: cancelToken,
       )) {
         final index = _messages.indexWhere((m) => m.id == placeholderId);

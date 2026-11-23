@@ -40,6 +40,7 @@ abstract class ConversationRepository {
     required List<ChatAttachment> attachments,
     required String apiKey,
     bool thinkingEnabled,
+    bool webSearch,
     CancelToken? cancelToken,
   });
 }

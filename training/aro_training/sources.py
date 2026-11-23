@@ -8,6 +8,7 @@ mistake. The `convert_*` functions are pure (testable without downloads).
 from __future__ import annotations
 
 import ast
+import json
 import random
 import re
 from collections.abc import Callable, Iterable
@@ -15,7 +16,8 @@ from typing import Any
 
 from aro_data.registry import assert_trainable, get
 
-from .bootstrap import build_oasst_threads, load_identity
+from .bootstrap import SEED_DIR, build_oasst_threads, load_identity
+from .config import WEB_INSTRUCTIONS, WEB_SEARCH_FAILED
 from .models import ModelSpec
 
 LANG_NAMES = {
@@ -119,6 +121,36 @@ def identity_for(spec: ModelSpec) -> list[dict[str, Any]]:
         answer = example["messages"][-1]
         answer["content"] = answer["content"].replace("ARO 1.5", spec.name)
     return examples
+
+
+def web_block(row: dict[str, Any]) -> str:
+    """The web-results text exactly as ai-router adds it to the system prompt."""
+    if row.get("failed"):
+        return WEB_SEARCH_FAILED
+    query, results = row.get("query", ""), row.get("results") or []
+    if not results:
+        return (f'{WEB_INSTRUCTIONS}\n\nWeb search for "{query}" returned no results. '
+                "Tell the user, then answer from your own knowledge and say so.")
+    listing = "\n\n".join(f"[{i + 1}] {r['title']}\n{r['url']}\n{r['text']}" for i, r in enumerate(results))
+    return f'{WEB_INSTRUCTIONS}\n\nSearch: "{query}"\n\n{listing}'
+
+
+def web_grounded_for(spec: ModelSpec) -> list[dict[str, Any]]:
+    """Answers built from live web results, with [n] citations (seed/web_grounded.jsonl)."""
+    out = []
+    with (SEED_DIR / "web_grounded.jsonl").open(encoding="utf-8") as f:
+        for i, line in enumerate(l for l in f if l.strip()):
+            row = json.loads(line)
+            out.append({
+                "messages": [
+                    {"role": "system", "content": f"{spec.system_prompt}\n\n{web_block(row)}"},
+                    {"role": "user", "content": row["user"]},
+                    {"role": "assistant", "content": row["assistant"]},
+                ],
+                "source": f"web-grounded:{i}",
+                "kind": "web",
+            })
+    return out
 
 
 # ------------------------------------------------------------------ loaders

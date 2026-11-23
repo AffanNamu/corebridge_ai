@@ -4,6 +4,7 @@
 
 import { type FileChanges, GitHubClient, GitHubError, type TreeEntry } from '../_shared/github.ts';
 import type { ToolCall, ToolDefinition, ToolResult } from '../_shared/llm/tool_chat.ts';
+import { readPage, type WebDeps, webSearch } from '../_shared/web.ts';
 import type { AgentState } from './state.ts';
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -79,6 +80,18 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: 'Get the GitHub Actions / check-run results for the latest pushed commit.',
     parameters: { type: 'object', properties: {} },
   },
+  {
+    name: 'web_search',
+    description:
+      'Search the internet. Use it when the user asks you to look something up online, or to find current docs, ' +
+      'error-message fixes, library versions or release notes. Returns titles, URLs and snippets.',
+    parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+  },
+  {
+    name: 'read_webpage',
+    description: 'Read the text of a public web page (e.g. a result from web_search, docs, an issue thread).',
+    parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+  },
 ];
 
 const MAX_READ_CHARS = 60_000;
@@ -97,6 +110,7 @@ export class ToolRunner {
     private readonly github: GitHubClient,
     private readonly state: AgentState,
     private readonly emit: (event: ToolEvent) => void,
+    private readonly web?: WebDeps,
   ) {}
 
   /** The ref to read from: the working branch once it exists on GitHub. */
@@ -139,9 +153,27 @@ export class ToolRunner {
         return await this.createPullRequest(requireString(args, 'title'), optionalString(args.body) ?? '');
       case 'get_ci_status':
         return await this.ciStatus();
+      case 'web_search':
+        return await this.webSearch(requireString(args, 'query'));
+      case 'read_webpage':
+        return await this.readWebpage(requireString(args, 'url'));
       default:
         throw new Error(`Unknown tool: ${call.name}`);
     }
+  }
+
+  private async webSearch(query: string): Promise<string> {
+    if (!this.web) throw new Error('Web search is not available here.');
+    const { provider, results } = await webSearch(query, this.web, 6);
+    if (!results.length) return `No web results for "${query}" (${provider}).`;
+    return results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n') +
+      '\n\nUse read_webpage on the most relevant result before relying on it, and cite the URLs you used.';
+  }
+
+  private async readWebpage(url: string): Promise<string> {
+    if (!this.web) throw new Error('Reading web pages is not available here.');
+    const page = await readPage(url, this.web, 12_000);
+    return `${page.title}\n${page.url}\n\n${page.text || '(no readable text)'}`;
   }
 
   private async loadTree(): Promise<TreeEntry[]> {

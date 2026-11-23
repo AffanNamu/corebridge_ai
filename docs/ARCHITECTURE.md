@@ -96,3 +96,7 @@ The full details are in [training/README.md](../training/README.md).
 ## Costs
 
 Rate limits, prompt and response caching, agent caps, scale-to-zero serving, the GPU budget with alerts and per-request cost traces are described in [COSTS.md](COSTS.md).
+
+## Web search
+
+When a user taps **Web**, or writes things like "search online", "look it up" or "don't use your training", ai-router searches the web (Tavily, Brave or Serper with a key, otherwise DuckDuckGo then Wikipedia), reads the top pages, and adds them to the model's instructions. The answer cites them as [1], [2] … and a Sources list with links is appended. The coding agent has `web_search` and `read_webpage` tools for docs and error fixes. Pages are read only from public addresses (private, local and metadata addresses are refused, including after redirects), and page text is treated as information, never as instructions. ARO's training data includes examples of answering from web results (`training/seed/web_grounded.jsonl`).

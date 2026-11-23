@@ -15,6 +15,7 @@ class AiRouterClient {
     required List<Map<String, dynamic>> messages,
     required String apiKey,
     bool thinkingEnabled = false,
+    bool webSearch = false,
     CancelToken? cancelToken,
   }) async* {
     if (supabaseFunctionsBaseUrl.trim().isEmpty) {
@@ -48,6 +49,7 @@ class AiRouterClient {
         'messages': messages,
         'apiKey': apiKey,
         'thinkingEnabled': thinkingEnabled,
+        if (webSearch) 'webSearch': true,
       }));
       request.add(bodyBytes);
 

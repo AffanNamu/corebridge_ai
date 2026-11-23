@@ -29,7 +29,7 @@ from .clean import clean, mix_with_replay
 from .config import CONFIG
 from .export import Conversation, build_examples, read_firestore, write_jsonl
 from .models import ModelSpec, spec, trainable_specs
-from .sources import identity_for, load_source
+from .sources import identity_for, load_source, web_grounded_for
 
 EXIT_NOTHING_NEW = 2
 IDENTITY_REPEAT = 8
@@ -71,7 +71,7 @@ def eval_texts(model: ModelSpec) -> list[str]:
         return [json.loads(line)["prompt"] for line in f if line.strip()]
 
 
-_REGISTRY_IDS = {"identity": "aro-identity", "feedback": "aro-user-feedback", "oasst2": "oasst2"}
+_REGISTRY_IDS = {"identity": "aro-identity", "feedback": "aro-user-feedback", "oasst2": "oasst2", "web-grounded": "aro-web-grounding"}
 
 
 def source_counts(examples: list[dict[str, Any]]) -> dict[str, int]:
@@ -106,7 +106,9 @@ def prepare_model(
         for dataset_id, count in model.starter_sources:
             starter += load_source(dataset_id, model, max(1, int(count * starter_scale)))
 
-    today, updated_history = build_training_set(user_examples, history, starter, identity_for(model))
+    # Always-included teaching examples: who ARO is, and how to answer from web results.
+    taught = identity_for(model) + web_grounded_for(model)
+    today, updated_history = build_training_set(user_examples, history, starter, taught)
     today, leaked = decontaminate(today, eval_texts(model))
     if leaked:
         print(f"[{model.id}] removed {leaked} examples that overlapped the test set.")
