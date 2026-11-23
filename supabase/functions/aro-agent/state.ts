@@ -2,7 +2,7 @@
 // sends it back with every request, so the Edge Function stays stateless
 // and a long task can continue across several requests.
 
-import type { AgentMessage } from '../_shared/llm/tool_chat.ts';
+import type { AgentMessage, ToolResult } from '../_shared/llm/tool_chat.ts';
 
 export type PushMode = 'branch' | 'direct';
 
@@ -18,6 +18,26 @@ export interface AgentState {
   pending: Record<string, string | null>;
   commits: { sha: string; url: string; message: string; files: string[] }[];
   pullRequest?: { number: number; url: string };
+  /** Server-side checkpoints (aro_agent_checkpoints) are keyed by this id. */
+  sessionId?: string;
+  /** Increases with every saved checkpoint; the newer of app/server state wins. */
+  checkpoint?: number;
+  /** Set while the run waits for the user to approve or decline a high-stakes action. */
+  run?: PendingConfirmation;
+}
+
+export interface PendingConfirmation {
+  phase: 'awaiting_confirmation';
+  /** The tool call waiting for approval. */
+  callId: string;
+  name: string;
+  args: Record<string, unknown>;
+  summary: string;
+  details: string[];
+  /** Results of calls in the same batch that already ran. */
+  done: ToolResult[];
+  /** Calls in the same batch after the gated one (not run). */
+  deferred: { id: string; name: string }[];
 }
 
 const NAME = /^[A-Za-z0-9_.-]{1,100}$/;
@@ -59,7 +79,23 @@ export function createState(
     transcript: [],
     pending: {},
     commits: [],
+    sessionId: crypto.randomUUID(),
+    checkpoint: 0,
   };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isSessionId(value: unknown): value is string {
+  return typeof value === 'string' && UUID.test(value);
+}
+
+function parseRun(raw: unknown): PendingConfirmation | undefined {
+  const r = raw as PendingConfirmation;
+  if (!r || r.phase !== 'awaiting_confirmation') return undefined;
+  if (typeof r.callId !== 'string' || typeof r.name !== 'string' || typeof r.summary !== 'string') return undefined;
+  if (!r.args || typeof r.args !== 'object' || !Array.isArray(r.done) || !Array.isArray(r.deferred)) return undefined;
+  return { ...r, details: Array.isArray(r.details) ? r.details.map(String) : [] };
 }
 
 /** Validates state sent back by the app. Returns an error message or the state. */
@@ -72,7 +108,13 @@ export function parseState(raw: unknown): AgentState | string {
   if (s.pushMode === 'branch' && s.workBranch === s.baseBranch) return 'Invalid working branch';
   if (!Array.isArray(s.transcript) || !Array.isArray(s.commits)) return 'Invalid agent state';
   if (!s.pending || typeof s.pending !== 'object') return 'Invalid agent state';
-  return { ...s, branchCreated: s.branchCreated === true };
+  return {
+    ...s,
+    branchCreated: s.branchCreated === true,
+    sessionId: isSessionId(s.sessionId) ? s.sessionId : crypto.randomUUID(),
+    checkpoint: Number.isInteger(s.checkpoint) && (s.checkpoint as number) >= 0 ? s.checkpoint : 0,
+    run: parseRun(s.run),
+  };
 }
 
 const KEEP_FULL = 6;

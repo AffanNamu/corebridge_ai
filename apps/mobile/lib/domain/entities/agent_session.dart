@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
 
 /// One line in an agent session's activity timeline.
@@ -68,7 +70,7 @@ class AgentSession extends Equatable {
   /// 'branch' (push to an aro/... branch) or 'direct' (push to [baseBranch]).
   final String pushMode;
 
-  /// 'idle' | 'paused' | 'error'
+  /// 'idle' | 'paused' | 'awaiting_confirmation' | 'error'
   final String status;
   final String? stateJson;
   final List<AgentTimelineItem> timeline;
@@ -172,8 +174,42 @@ class AgentSession extends Equatable {
     );
   }
 
+  /// The step waiting for the user's approval (status 'awaiting_confirmation'), read from the saved state.
+  PendingApproval? get pendingApproval {
+    if (status != 'awaiting_confirmation' || stateJson == null) return null;
+    try {
+      final run = (jsonDecode(stateJson!) as Map<String, dynamic>)['run'];
+      if (run is! Map || run['phase'] != 'awaiting_confirmation') return null;
+      return PendingApproval(
+        id: run['callId'] as String? ?? '',
+        tool: run['name'] as String? ?? '',
+        summary: run['summary'] as String? ?? '',
+        details: ((run['details'] as List?) ?? const []).map((e) => '$e').toList(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   List<Object?> get props => [id, repoOwner, repoName, status, stateJson, timeline, commitCount, pullRequestUrl, updatedAt];
+}
+
+/// A risky step (opening a pull request, pushing to the base branch, deleting
+/// files, touching CI or secrets…) the agent won't take without approval.
+class PendingApproval {
+  final String id;
+  final String tool;
+  final String summary;
+  final List<String> details;
+  const PendingApproval({required this.id, required this.tool, required this.summary, this.details = const []});
+
+  factory PendingApproval.fromEvent(Map<String, dynamic> data) => PendingApproval(
+        id: data['id'] as String? ?? '',
+        tool: data['tool'] as String? ?? '',
+        summary: data['summary'] as String? ?? '',
+        details: ((data['details'] as List?) ?? const []).map((e) => '$e').toList(),
+      );
 }
 
 /// One event streamed by the aro-agent Edge Function.

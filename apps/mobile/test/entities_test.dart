@@ -89,4 +89,21 @@ void main() {
     expect(availableModels.where((m) => !m.isAro).map((m) => m.provider), ['claude', 'openai', 'gemini', 'qwen']);
     expect(availableModels.where((m) => m.supportsVision && m.isAro).map((m) => m.aroModel), ['auto', 'aro-vision']);
   });
+
+  test('AgentSession reads the step awaiting approval from its state', () {
+    final at = DateTime.fromMillisecondsSinceEpoch(1000);
+    final state = '{"run":{"phase":"awaiting_confirmation","callId":"c1","name":"create_pull_request",'
+        '"summary":"Open a pull request","details":["Collaborators may be notified."]}}';
+    final session = AgentSession(
+      id: 's', ownerId: 'u', repoOwner: 'o', repoName: 'r', title: 't', baseBranch: 'main', pushMode: 'branch',
+      status: 'awaiting_confirmation', stateJson: state, createdAt: at, updatedAt: at,
+    );
+    final pending = session.pendingApproval!;
+    expect(pending.id, 'c1');
+    expect(pending.tool, 'create_pull_request');
+    expect(pending.details, ['Collaborators may be notified.']);
+    expect(session.copyWith(status: 'idle').pendingApproval, isNull);
+    expect(session.copyWith(stateJson: '{"run":null}').pendingApproval, isNull);
+    expect(session.copyWith(stateJson: 'not json').pendingApproval, isNull);
+  });
 }

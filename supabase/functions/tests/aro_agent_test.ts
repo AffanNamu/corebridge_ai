@@ -160,7 +160,20 @@ Deno.test('agent fixes a bug, pushes one commit to a new branch and opens a PR',
     verify,
     fetchImpl: githubFetch(repo, model.handler),
   });
-  const out = await events(res);
+  const first = await events(res);
+
+  // Opening a pull request notifies people: the run stops and asks first.
+  const ask = first.find((e) => e.type === 'confirm');
+  assertEquals(ask.tool, 'create_pull_request');
+  assertStringIncludes(ask.summary, 'Open a pull request "Fix add()"');
+  assertEquals(first.at(-1), { type: 'done', status: 'awaiting_confirmation' });
+  assertEquals(repo.pulls.length, 0, 'nothing happens before the user approves');
+
+  const res2 = await handleRequest(request({ ...base, continue: true, state: first.find((e) => e.type === 'state').state, confirm: { id: ask.id, approve: true } }), {
+    verify,
+    fetchImpl: githubFetch(repo, model.handler),
+  });
+  const out = [...first, ...await events(res2)];
 
   const commit = out.find((e) => e.type === 'commit');
   assert(commit, 'commit event');
@@ -223,7 +236,15 @@ Deno.test('direct push mode commits to the base branch', async () => {
     { calls: [{ name: 'write_file', args: { path: 'a.txt', content: 'y\n' } }, { name: 'commit_and_push', args: { message: 'x -> y' } }] },
     { text: 'ok' },
   ]);
-  await events(await handleRequest(request({ ...base, message: 'go', pushMode: 'direct' }), {
+  const first = await events(await handleRequest(request({ ...base, message: 'go', pushMode: 'direct' }), {
+    verify,
+    fetchImpl: githubFetch(repo, model.handler),
+  }));
+  // Pushing straight to the base branch always needs an explicit yes.
+  const ask = first.find((e) => e.type === 'confirm');
+  assertStringIncludes(ask.details[0], 'pushes straight to "main"');
+  assertEquals(repo.branches.main, 'c0');
+  await events(await handleRequest(request({ ...base, continue: true, state: first.find((e) => e.type === 'state').state, confirm: { id: ask.id, approve: true } }), {
     verify,
     fetchImpl: githubFetch(repo, model.handler),
   }));

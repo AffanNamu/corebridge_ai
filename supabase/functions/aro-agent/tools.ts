@@ -4,6 +4,8 @@
 
 import { type FileChanges, GitHubClient, GitHubError, type TreeEntry } from '../_shared/github.ts';
 import type { ToolCall, ToolDefinition, ToolResult } from '../_shared/llm/tool_chat.ts';
+import { CALC_TOOLS, runCalcTool } from '../_shared/calc.ts';
+import { type JsonSchema, validate } from '../_shared/schema.ts';
 import { readPage, type WebDeps, webSearch } from '../_shared/web.ts';
 import type { AgentState } from './state.ts';
 
@@ -92,7 +94,23 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: 'Read the text of a public web page (e.g. a result from web_search, docs, an issue thread).',
     parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
   },
+  ...CALC_TOOLS,
 ];
+
+const TOOLS_BY_NAME = new Map(TOOL_DEFINITIONS.map((t) => [t.name, t]));
+
+/** Tools that only read: safe to retry automatically on a transient GitHub/network error. */
+const READ_ONLY = new Set(['list_files', 'read_file', 'search_code', 'get_ci_status', 'web_search', 'read_webpage']);
+const MAX_TOOL_RETRIES = 3;
+
+/** Paths whose changes always need the user's confirmation (CI, secrets, infrastructure, database migrations). */
+const SENSITIVE_PATH = /(^|\/)(\.github\/workflows\/|\.gitlab-ci|\.circleci\/|Jenkinsfile|\.env|secrets?[./]|credentials|id_rsa|.*\.pem$|.*\.keystore$|.*\.jks$|Dockerfile|docker-compose|terraform\/|.*\.tf$|k8s\/|helm\/|supabase\/migrations\/|migrations\/)/i;
+const MANY_FILES = 20;
+
+export interface Confirmation {
+  summary: string;
+  details: string[];
+}
 
 const MAX_READ_CHARS = 60_000;
 const MAX_LIST = 800;
@@ -118,14 +136,66 @@ export class ToolRunner {
     return this.state.branchCreated ? this.state.workBranch : this.state.baseBranch;
   }
 
+  /**
+   * Runs one tool call. Arguments are validated against the tool's JSON Schema
+   * first: an invalid call is never executed, and comes back as an error the
+   * model can fix (`invalid: true`). Read-only tools retry transient failures.
+   */
   async run(call: ToolCall): Promise<ToolResult> {
-    try {
-      const content = await this.dispatch(call);
-      return { id: call.id, name: call.name, content };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { id: call.id, name: call.name, content: message, isError: true };
+    const def = TOOLS_BY_NAME.get(call.name);
+    if (!def) return { id: call.id, name: call.name, content: `Unknown tool "${call.name}".`, isError: true, invalid: true };
+    if ('_invalid_json' in call.args) {
+      return { id: call.id, name: call.name, content: 'The arguments were not valid JSON. Send a JSON object that matches the tool schema.', isError: true, invalid: true };
     }
+    const problems = validate(def.parameters as JsonSchema, call.args);
+    if (problems.length) {
+      return {
+        id: call.id, name: call.name, isError: true, invalid: true,
+        content: `Invalid arguments for ${call.name}, so it was not run:\n- ${problems.join('\n- ')}\nFix them and call it again.`,
+      };
+    }
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return { id: call.id, name: call.name, content: await this.dispatch(call) };
+      } catch (err) {
+        const transient = err instanceof GitHubError ? err.status >= 500 || err.status === 429 : false;
+        if (transient && READ_ONLY.has(call.name) && attempt < MAX_TOOL_RETRIES) {
+          await new Promise((r) => setTimeout(r, 250 * 2 ** attempt));
+          continue;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        return { id: call.id, name: call.name, content: message, isError: true };
+      }
+    }
+  }
+
+  /**
+   * High-stakes or irreversible actions need the user's explicit approval:
+   * pushing straight to the base branch, deleting files, large or sensitive
+   * commits (CI, secrets, infrastructure, migrations), and opening a pull
+   * request (it notifies other people). Returns what to ask, or null.
+   */
+  needsConfirmation(call: ToolCall): Confirmation | null {
+    if (call.name === 'create_pull_request') {
+      return {
+        summary: `Open a pull request "${String(call.args.title ?? '').slice(0, 120)}" from ${this.state.workBranch} into ${this.state.baseBranch}`,
+        details: ['Collaborators on the repository may be notified.'],
+      };
+    }
+    if (call.name !== 'commit_and_push') return null;
+    const paths = Object.keys(this.state.pending);
+    const deleted = paths.filter((p) => this.state.pending[p] === null);
+    const sensitive = paths.filter((p) => SENSITIVE_PATH.test(p));
+    const reasons: string[] = [];
+    if (this.state.pushMode === 'direct') reasons.push(`pushes straight to "${this.state.baseBranch}" (no pull request to review first)`);
+    if (deleted.length) reasons.push(`deletes ${deleted.length} file(s): ${deleted.slice(0, 10).join(', ')}`);
+    if (sensitive.length) reasons.push(`changes sensitive files: ${sensitive.slice(0, 10).join(', ')}`);
+    if (paths.length > MANY_FILES) reasons.push(`changes ${paths.length} files`);
+    if (!reasons.length) return null;
+    return {
+      summary: `Commit and push "${String(call.args.message ?? '').split('\n')[0].slice(0, 120)}" (${paths.length} file(s))`,
+      details: reasons,
+    };
   }
 
   private async dispatch(call: ToolCall): Promise<string> {
@@ -157,6 +227,9 @@ export class ToolRunner {
         return await this.webSearch(requireString(args, 'query'));
       case 'read_webpage':
         return await this.readWebpage(requireString(args, 'url'));
+      case 'calculate':
+      case 'date_math':
+        return runCalcTool(call.name, args);
       default:
         throw new Error(`Unknown tool: ${call.name}`);
     }

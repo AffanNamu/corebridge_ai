@@ -77,9 +77,9 @@ Status: ✅ in place · 🟡 partial · ❌ missing
 
 | Pattern | Today | Status |
 |---|---|---|
-| Graph orchestration | A **bounded loop** (step, token and time caps from the plan; a breaker for repeated identical calls; pause and *Continue*). It is still an open loop with no explicit states, entry or exit conditions, or retry policy. | 🟡 |
-| Persistent checkpoints | The state is returned to the app at the end of each request and saved in Firestore. If the function is killed mid-run, that run's progress is lost (pushed commits survive on GitHub). | 🟡 |
-| Human-in-the-loop | Direct push to the main branch requires an explicit opt-in with a warning. The default is a working branch plus a pull request, which is itself a review gate. There is no per-action confirmation for deleting files, mass edits or opening PRs. | 🟡 |
+| Graph orchestration | **Phase 1 (done):** an explicit state machine in `aro-agent/handler.ts`: `resolve_confirmation → model → tools →` `completed` \| `paused` \| `awaiting_confirmation` \| `failed`. Transient model errors retry 3 times with backoff (1 s, 2 s, 4 s); 3 consecutive all-invalid tool batches end the run as `failed` with a report. The step, token and time caps and the repeated-call breaker still apply. Plan, verify and critique states come in Phases 2 and 4. | ✅ |
+| Persistent checkpoints | **Phase 1 (done):** the state is saved to Postgres (`aro_agent_checkpoints`, service_role only, RLS on) after every step, and the app keeps its copy. On *Continue* the newer checkpoint wins, so a run killed mid-way resumes from its last step. Another user can't load it. Checkpoints are kept 30 days. | ✅ |
+| Human-in-the-loop | **Phase 1 (done):** the run stops in `awaiting_confirmation` with a summary of exactly what will happen before: opening a pull request; a direct push to the base branch; deleting files; touching CI, env, secrets, infra or migrations; or changing more than 20 files. The app shows **Approve / Decline**. Declining, or typing a new message, tells the model the step was not approved, and calls after it in the same batch are not run. | ✅ |
 
 **What to build:**
 - **Explicit state machine** in `aro-agent`:
@@ -96,7 +96,8 @@ Status: ✅ in place · 🟡 partial · ❌ missing
 | Pattern | Today | Status |
 |---|---|---|
 | Sandbox execution | None. The agent says it "cannot run code". Its only real feedback is `get_ci_status` **after** pushing. | ❌ |
-| Strict structured outputs | Tool parameters are declared as JSON Schema, but arguments are hand-checked per tool (`requireString`) and invalid JSON is passed through. SSE frames and agent state are ad hoc objects. The database calls are typed and validated in SQL. | 🟡 |
+| Strict structured outputs | **Phase 1 (done):** every tool call is validated against its JSON Schema (`_shared/schema.ts`; `additionalProperties: false`, types, enums, lengths, patterns) before it runs. Invalid calls and unparseable JSON are never executed: the model gets the exact errors back. Agent state is normalised by `parseState`. **Still open:** vLLM guided decoding for ARO tool calls, and typed SSE frames. | 🟡 |
+| Deterministic maths and dates | **Phase 1 (done):** `calculate` (an exact parser with no `eval`: + − × ÷ ^ %, `of`, factorial, sqrt/log/trig/round…) and `date_math` (today in any timezone, add, diff, weekday). The agent has both as tools. In chat, `ai-router` evaluates a bare expression directly; for word problems it runs a short tool pass (3 rounds at most) before answering. The verified values go to the model, which explains them instead of computing. Date answers are never cached. | ✅ |
 
 **What to build:**
 - **Sandbox service:**
@@ -115,7 +116,7 @@ Each phase builds on the one before and ships independently, with tests.
 
 | Phase | Build | Why first | Size |
 |---|---|---|---|
-| **1. Foundation** | Agent state machine + Postgres checkpoints + confirmation gates · strict schema validation of tool calls (+ guided JSON for ARO) · deterministic `calculate` / `date_math` tools for the agent and chat | Everything else (plans, critics, sandbox steps, retries) plugs into the state machine. Schemas stop malformed calls today. Calculator and date tools remove a whole class of hallucination cheaply. | M |
+| **1. Foundation** ✅ (guided JSON still open) | Agent state machine + Postgres checkpoints + confirmation gates · strict schema validation of tool calls (+ guided JSON for ARO) · deterministic `calculate` / `date_math` tools for the agent and chat | Everything else (plans, critics, sandbox steps, retries) plugs into the state machine. Schemas stop malformed calls today. Calculator and date tools remove a whole class of hallucination cheaply. | M |
 | **2. Plan and critique** | JSON plan step (shown to the user; it becomes the step list) · critic before commit and for long code answers · episodic log of agent failures and corrections, checked before runs | Needs the Phase 1 state machine. It turns the agent from act-first into plan → act → check. | M |
 | **3. Knowledge and memory** | `pgvector` + `pg_trgm` knowledge store · real Knowledge Base (upload, chunk, embed) · strict-RAG router with confidence threshold · citation verifier · rolling summaries at 70% · long-term `memories` with consent | The largest piece, and it needs product decisions: which domains count as "ours", and the memory consent design. | L |
 | **4. Real execution** | Sandbox runner (RunPod CPU serverless) + `run_in_sandbox` · tests run in `VERIFY_STEP` before commit · Python for heavy data and maths | Needs infrastructure and a vendor or isolation decision. Plugs into the Phase 1 state machine. | M–L |

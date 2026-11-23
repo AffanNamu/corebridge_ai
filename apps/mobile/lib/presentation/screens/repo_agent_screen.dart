@@ -118,7 +118,18 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
     if (mounted) setState(() => _pushDirect = ok == true);
   }
 
-  Future<void> _run({String? message, bool continueRun = false}) async {
+  /// Approves or declines the step the agent is waiting on, then lets it carry on.
+  Future<void> _answer(PendingApproval pending, bool approve) async {
+    final now = DateTime.now();
+    setState(() => _timeline.add(AgentTimelineItem(
+          kind: 'status',
+          text: approve ? 'You approved: ${pending.summary}' : 'You declined: ${pending.summary}',
+          at: now,
+        )));
+    await _run(continueRun: true, confirm: {'id': pending.id, 'approve': approve});
+  }
+
+  Future<void> _run({String? message, bool continueRun = false, Map<String, dynamic>? confirm}) async {
     if (_running) return;
     final uid = ref.read(firebaseServiceProvider).currentUserId;
     if (uid == null) return;
@@ -180,6 +191,7 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
             pushMode: session.pushMode,
             message: message,
             continueRun: continueRun,
+            confirm: confirm,
             state: stateJson == null ? null : jsonDecode(stateJson) as Map<String, dynamic>,
             cancelToken: cancelToken,
           );
@@ -224,6 +236,9 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
             case 'error':
               status = 'error';
               _timeline.add(AgentTimelineItem(kind: 'error', text: event.text, ok: false, at: at));
+            case 'confirm':
+              final pending = PendingApproval.fromEvent(event.data);
+              _timeline.add(AgentTimelineItem(kind: 'confirm', text: pending.summary, detail: pending.details.join('\n'), at: at));
             case 'state':
               final state = event.data['state'] as Map<String, dynamic>?;
               if (state != null) {
@@ -234,7 +249,12 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
               }
             case 'done':
               final s = event.data['status'] as String?;
-              status = s == 'paused' ? 'paused' : (s == 'error' ? 'error' : 'idle');
+              status = switch (s) {
+                'paused' => 'paused',
+                'awaiting_confirmation' => 'awaiting_confirmation',
+                'error' || 'failed' => 'error',
+                _ => 'idle',
+              };
           }
         });
         _scrollToEnd();
@@ -313,7 +333,11 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
               children: sessions
                   .map((s) => ListTile(
                         leading: Icon(
-                          s.status == 'paused' ? Icons.pause_circle_outline_rounded : Icons.task_alt_rounded,
+                          switch (s.status) {
+                            'paused' => Icons.pause_circle_outline_rounded,
+                            'awaiting_confirmation' => Icons.help_outline_rounded,
+                            _ => Icons.task_alt_rounded,
+                          },
                           color: s.status == 'error' ? Colors.redAccent : AppColors.accentBlue,
                         ),
                         title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -359,6 +383,12 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
                     },
                   ),
           ),
+          if (!_running && _session?.pendingApproval != null)
+            _ApprovalCard(
+              pending: _session!.pendingApproval!,
+              onApprove: () => _answer(_session!.pendingApproval!, true),
+              onDecline: () => _answer(_session!.pendingApproval!, false),
+            ),
           if (!_running && _session?.status == 'paused')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -597,6 +627,26 @@ class _TimelineTile extends StatelessWidget {
             onTap: () => _open(item.url),
           ),
         );
+      case 'confirm':
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.front_hand_outlined, size: 18, color: Colors.amberAccent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Needs your approval: ${item.text}', style: const TextStyle(color: AppColors.textPrimary)),
+              ),
+            ],
+          ),
+        );
       case 'error':
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 6),
@@ -614,5 +664,57 @@ class _TimelineTile extends StatelessWidget {
           child: Text(item.text, style: const TextStyle(color: AppColors.textMuted, fontStyle: FontStyle.italic)),
         );
     }
+  }
+}
+
+/// Shown while the agent waits for approval of a risky step.
+class _ApprovalCard extends StatelessWidget {
+  final PendingApproval pending;
+  final VoidCallback onApprove;
+  final VoidCallback onDecline;
+  const _ApprovalCard({required this.pending, required this.onApprove, required this.onDecline});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('ARO wants to:', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(pending.summary, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+          for (final line in pending.details)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('• $line', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            ),
+          const SizedBox(height: 4),
+          const Text(
+            'Or type a message instead to tell ARO what to do differently.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(onPressed: onDecline, child: const Text('Decline')),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(onPressed: onApprove, child: const Text('Approve')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

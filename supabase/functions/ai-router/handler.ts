@@ -38,6 +38,7 @@ import {
   logUsage,
   type Usage,
 } from '../_shared/cost.ts';
+import { computeForChat, mentionsDate } from '../_shared/compute.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
 import {
   LANGUAGE_RULES,
@@ -210,7 +211,8 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
     }
     : { traceId };
 
-  const useCache = aro !== undefined && !web && body.cache !== false && cacheable(finalMessages, thinking);
+  // Date answers depend on today's date: never cached.
+  const useCache = aro !== undefined && !web && !mentionsDate(lastUserText) && body.cache !== false && cacheable(finalMessages, thinking);
   const key = useCache ? await cacheKey(`${aro!.aroModel}\n${aro!.systemPrompt}`, finalMessages) : '';
   const logBase = {
     traceId, userId: user.uid, surface: 'chat' as const, provider, aroModel: aro?.aroModel,
@@ -233,6 +235,14 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
           return;
         }
 
+        // Deterministic offloading: arithmetic and dates are computed by exact tools, not by the model.
+        const computed = await computeForChat(finalMessages, endpoints, deps.fetchImpl);
+        if (computed.block) {
+          if (computed.results.length) controller.enqueue(sseFrame({ status: `Computed ${computed.results.length} exact value(s)` }));
+          metaExtra.computed = computed.results;
+          finalMessages = withSystemBlock(finalMessages, computed.block);
+        }
+
         let sources: SearchResult[] = [];
         if (web) {
           controller.enqueue(sseFrame({ status: 'Searching the web…' }));
@@ -240,11 +250,7 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
           sources = found.results;
           controller.enqueue(sseFrame({ status: found.status, web: { query: found.query, sources } }));
           metaExtra.web = { query: found.query, provider: found.provider, sources: sources.map(({ title, url }) => ({ title, url })) };
-          // One system message (Qwen/ARO's chat template expects it first and only once).
-          const sys = finalMessages.findIndex((m) => m.role === 'system' && typeof m.content === 'string');
-          finalMessages = sys >= 0
-            ? finalMessages.map((m, i) => (i === sys ? { ...m, content: `${m.content}\n\n${found.block}` } : m))
-            : [{ role: 'system', content: found.block }, ...finalMessages];
+          finalMessages = withSystemBlock(finalMessages, found.block);
         }
 
         let answer = '';
@@ -350,6 +356,14 @@ export async function streamWithFallback(
     }
   }
   throw lastError;
+}
+
+/** Appends text to the one system message (Qwen/ARO's chat template expects a single system message, first). */
+export function withSystemBlock(messages: ChatMessage[], text: string): ChatMessage[] {
+  const sys = messages.findIndex((m) => m.role === 'system' && typeof m.content === 'string');
+  return sys >= 0
+    ? messages.map((m, i) => (i === sys ? { ...m, content: `${m.content}\n\n${text}` } : m))
+    : [{ role: 'system', content: text }, ...messages];
 }
 
 interface WebContext {

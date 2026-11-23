@@ -23,6 +23,8 @@ export interface ToolResult {
   name: string;
   content: string;
   isError?: boolean;
+  /** The call failed schema validation and was not executed. */
+  invalid?: boolean;
 }
 
 export type AgentMessage =

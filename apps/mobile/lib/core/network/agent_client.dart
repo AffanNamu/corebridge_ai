@@ -24,6 +24,8 @@ class AgentClient {
     String? message,
     bool continueRun = false,
     Map<String, dynamic>? state,
+    /// Answer to a `confirm` event: {'id': callId, 'approve': bool}.
+    Map<String, dynamic>? confirm,
     CancelToken? cancelToken,
   }) async* {
     if (supabaseFunctionsBaseUrl.trim().isEmpty) {
@@ -55,6 +57,7 @@ class AgentClient {
         if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
         if (continueRun) 'continue': true,
         if (state != null) 'state': state,
+        if (confirm != null) 'confirm': confirm,
       })));
 
       final response = await request.close();
