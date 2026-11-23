@@ -70,6 +70,15 @@ async function post(
   }
   if (!response.ok || !response.body) {
     const text = await response.text().catch(() => '');
+    if (label === 'ARO model server' && (response.status === 401 || response.status === 403)) {
+      // ARO's own server refused the server-side key: a configuration problem, not the user's.
+      throw new ProviderError(
+        "ARO's model server rejected the server key (ARO_MODEL_API_KEY in Supabase). " +
+          'An admin needs to set a valid RunPod API key. Meanwhile, pick another model.',
+        502,
+        true,
+      );
+    }
     throw new ProviderError(
       `${label} error (${response.status}): ${shortError(text)}`,
       response.status,

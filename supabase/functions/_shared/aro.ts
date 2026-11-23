@@ -185,14 +185,14 @@ export async function resolveAro(
  */
 export function aroEndpoints(kind: string, servedName: string, env: Env): Endpoint[] {
   const endpoints: Endpoint[] = [];
-  const key = env('ARO_MODEL_API_KEY')?.trim() || 'aro-no-key';
+  const key = cleanKey(env('ARO_MODEL_API_KEY')) || 'aro-no-key';
   const strip = (url: string) => url.replace(/\/+$/, '');
 
   if (kind === 'vision') {
     const url = env('ARO_VISION_BASE_URL')?.trim();
     if (url) {
       endpoints.push({
-        provider: 'aro', kind: 'openai', baseUrl: strip(url), apiKey: env('ARO_VISION_API_KEY')?.trim() || key,
+        provider: 'aro', kind: 'openai', baseUrl: strip(url), apiKey: cleanKey(env('ARO_VISION_API_KEY')) || key,
         model: servedName, servedBy: 'aro',
       });
     }
@@ -209,7 +209,7 @@ export function aroEndpoints(kind: string, servedName: string, env: Env): Endpoi
     if (fallbackUrl && fallbackModel) {
       endpoints.push({
         provider: 'aro', kind: 'openai', baseUrl: strip(fallbackUrl),
-        apiKey: env('ARO_FALLBACK_API_KEY')?.trim() || 'aro-no-key', model: fallbackModel, servedBy: 'fallback',
+        apiKey: cleanKey(env('ARO_FALLBACK_API_KEY')) || 'aro-no-key', model: fallbackModel, servedBy: 'fallback',
       });
     }
   }
@@ -218,6 +218,11 @@ export function aroEndpoints(kind: string, servedName: string, env: Env): Endpoi
     throw new ProviderError('The ARO model server is offline right now. Please try again later or pick another model.', 503, false);
   }
   return endpoints;
+}
+
+/** A key as pasted into Supabase secrets: tolerate "Bearer ", quotes and whitespace around it. */
+export function cleanKey(value: string | undefined): string {
+  return (value ?? '').trim().replace(/^bearer\s+/i, '').replace(/^["'](.*)["']$/, '$1').trim();
 }
 
 /** Whether a failure may move on to the next endpoint. */

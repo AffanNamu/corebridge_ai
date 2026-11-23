@@ -173,3 +173,20 @@ Deno.test({ name: 'admin API: admins only, validated, and changes take effect', 
   const audit = await db.sql<{ admin_uid: string }>('select admin_uid from aro_admin_audit');
   assert(audit.length >= 4 && audit.every((a) => a.admin_uid === 'admin-uid-1'));
 } });
+
+Deno.test('pasted keys are cleaned and a rejected ARO key gives a clear message', async () => {
+  const { cleanKey } = await import('../_shared/aro.ts');
+  assertEquals(cleanKey('  Bearer rpa_ABC123 \n'), 'rpa_ABC123');
+  assertEquals(cleanKey('"rpa_ABC123"'), 'rpa_ABC123');
+  assertEquals(cleanKey(undefined), '');
+
+  const { streamChat } = await import('../_shared/llm/chat_stream.ts');
+  const fetchImpl = (async () => new Response('{"detail":"invalid api key"}', { status: 401 })) as typeof fetch;
+  const endpoint = { provider: 'aro' as const, kind: 'openai' as const, baseUrl: 'https://x/v1', apiKey: 'k', model: 'aro-1.5', servedBy: 'aro' };
+  try {
+    for await (const _ of streamChat(endpoint, [{ role: 'user', content: 'hi' }], { fetchImpl })) { /* nothing */ }
+    throw new Error('expected an error');
+  } catch (err) {
+    assertStringIncludes((err as Error).message, 'ARO_MODEL_API_KEY');
+  }
+});

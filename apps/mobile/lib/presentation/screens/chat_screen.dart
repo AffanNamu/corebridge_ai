@@ -380,7 +380,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (msg.contains('No API key set') || msg.contains('No API key provided')) {
       return 'No API key set for this provider. Open the menu → API Providers to add one.';
     }
-    return msg.replaceFirst('Exception: ', '').replaceFirst('StateError: ', '').replaceFirst('HttpException: ', '');
+    return msg.replaceFirst(RegExp(r'^(HttpException|StateError|Bad state|Exception): '), '');
   }
 
   @override
