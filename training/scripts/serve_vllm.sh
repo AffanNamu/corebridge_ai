@@ -10,5 +10,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CMD=$(python -m aro_training.serve)
-echo "$CMD"
+echo "$CMD" | sed -E 's/(--api-key )[^ ]+/\1***/'   # never print the key
 eval "exec $CMD"
