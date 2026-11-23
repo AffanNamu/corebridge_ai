@@ -115,7 +115,7 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   // Rate limits for every provider; the GPU budget only for ARO's own models.
   let limits: GateResult;
   try {
-    limits = await gate(db, user.uid, provider === 'aro');
+    limits = await gate(db, user.uid, provider === 'aro', isAdmin(user.uid, env));
   } catch (err) {
     return providerErrorResponse(err);
   }

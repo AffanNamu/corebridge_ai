@@ -26,7 +26,7 @@
 import { type AroResolution, canTryNext, resolveAro } from '../_shared/aro.ts';
 import { aroContextTokens, gate, GateError, type GateResult, logUsage, type UsageEvent } from '../_shared/cost.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
-import { refund } from '../_shared/entitlements.ts';
+import { isAdmin, refund } from '../_shared/entitlements.ts';
 import type { VerifiedUser } from '../_shared/firebase-auth.ts';
 import { GitHubClient, GitHubError } from '../_shared/github.ts';
 import { CORS_HEADERS, errorResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
@@ -116,7 +116,7 @@ export async function handleRequest(req: Request, deps: AgentDeps): Promise<Resp
 
   let limits: GateResult;
   try {
-    limits = await gate(db, user.uid, body.provider === 'aro');
+    limits = await gate(db, user.uid, body.provider === 'aro', isAdmin(user.uid, env));
   } catch (err) {
     if (err instanceof GateError) {
       const response = errorResponse(err.message, 429);

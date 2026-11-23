@@ -335,3 +335,21 @@ Deno.test({ name: 'admin cost report and settings', ...pg, fn: async () => {
     await db.pg.query('reset role');
   }
 } });
+
+Deno.test({ name: 'admins skip rate limits and the budget breaker', ...pg, fn: async () => {
+  const db = await testDb();
+  const today = new Date().toISOString().slice(0, 10);
+  await db.sql('insert into aro_spend_daily (day, cost_usd) values ($1, 100)', [today]); // over the hard budget
+  const server = aroServer();
+  const adminEnv = env({ ARO_MODEL_BASE_URL: 'https://aro.example/v1', ADMIN_UIDS: 'user-1' });
+  for (let i = 0; i < 10; i++) { // more than Free's 6 per minute
+    const res = await chat(ask(`admin question ${i}`), { verify, db, fetchImpl: server.fetchImpl, env: adminEnv });
+    assertEquals(res.status, 200);
+    await frames(res);
+  }
+  assertEquals(server.bodies.length, 10);
+  assertEquals(server.bodies[0].max_tokens, 8192);
+  // Everyone else is still stopped by the breaker.
+  const other = await chat(ask('hi'), { verify, db, fetchImpl: server.fetchImpl, env: ARO_ENV });
+  assertEquals(other.status, 429);
+} });

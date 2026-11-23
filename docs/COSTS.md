@@ -85,7 +85,7 @@ When a cap is hit, the run **pauses** and the user can tap *Continue*. That star
 | Pro | 20 | 400 |
 | Premium | 40 | 1,000 |
 
-Over the limit, the request gets a 429 with `Retry-After` before any model or quota is touched. The counters are fixed windows in Postgres (`aro_rate_counters`), safe under concurrency. If the database is unreachable, bring-your-own-key requests still go through; ARO's own models stay closed.
+Over the limit, the request gets a 429 with `Retry-After` before any model or quota is touched. Admins (`ADMIN_UIDS`) skip rate limits and the budget breaker and get the largest caps. The counters are fixed windows in Postgres (`aro_rate_counters`), safe under concurrency. If the database is unreachable, bring-your-own-key requests still go through; ARO's own models stay closed.
 
 ## 3. GPU and compute
 

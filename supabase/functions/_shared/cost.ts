@@ -31,7 +31,17 @@ export interface GateResult {
  * their plan's rate limit, or (for ARO's own GPUs) the daily budget is used up.
  * Without a database, everything is allowed.
  */
-export async function gate(db: Db | null, userId: string, ownGpu: boolean): Promise<GateResult> {
+/** Admins (ADMIN_UIDS) are never rate-limited or stopped by the budget, and get the largest caps. */
+export const ADMIN_LIMITS: GateResult = {
+  allowed: true,
+  plan: 'admin',
+  max_output_tokens: 8192,
+  agent_max_steps: 50,
+  agent_max_tokens: 3_000_000,
+};
+
+export async function gate(db: Db | null, userId: string, ownGpu: boolean, admin = false): Promise<GateResult> {
+  if (admin) return ADMIN_LIMITS;
   if (!db) return { allowed: true };
   let result: GateResult;
   try {
