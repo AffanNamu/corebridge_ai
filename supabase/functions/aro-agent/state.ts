@@ -3,6 +3,7 @@
 // and a long task can continue across several requests.
 
 import type { AgentMessage, ToolResult } from '../_shared/llm/tool_chat.ts';
+import { type Plan, parsePlan } from './plan.ts';
 
 export type PushMode = 'branch' | 'direct';
 
@@ -24,6 +25,12 @@ export interface AgentState {
   checkpoint?: number;
   /** Set while the run waits for the user to approve or decline a high-stakes action. */
   run?: PendingConfirmation;
+  /** The plan for the current instruction (set_plan). */
+  plan?: Plan;
+  /** True after a new user message: the next change needs a new or updated plan. */
+  planStale?: boolean;
+  /** Commits held back by the reviewer since the last successful commit. */
+  reviewRejections?: number;
 }
 
 export interface PendingConfirmation {
@@ -114,6 +121,9 @@ export function parseState(raw: unknown): AgentState | string {
     sessionId: isSessionId(s.sessionId) ? s.sessionId : crypto.randomUUID(),
     checkpoint: Number.isInteger(s.checkpoint) && (s.checkpoint as number) >= 0 ? s.checkpoint : 0,
     run: parseRun(s.run),
+    plan: parsePlan(s.plan),
+    planStale: s.planStale === true,
+    reviewRejections: Number.isInteger(s.reviewRejections) && (s.reviewRejections as number) >= 0 ? s.reviewRejections : 0,
   };
 }
 

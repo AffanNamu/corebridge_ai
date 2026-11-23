@@ -16,6 +16,7 @@
 // Response: SSE frames, each `data: {...}` with a `type`:
 //   status | text | tool | tool_result | commit | pull_request | error | usage
 //   | confirm {id, tool, summary, details}  (approve with { continue: true, state, confirm: { id, approve } })
+//   | plan {plan: {goal, steps[{title, status}]}} | review {verdict, issues[{severity, file?, problem}]}
 //   then `state` (save it and send it back next time), then `done` with status
 //   completed | paused | awaiting_confirmation | failed | error.
 //
@@ -32,10 +33,13 @@ import { type Db, dbFromEnv } from '../_shared/db.ts';
 import { isAdmin, refund } from '../_shared/entitlements.ts';
 import type { VerifiedUser } from '../_shared/firebase-auth.ts';
 import { GitHubClient, GitHubError } from '../_shared/github.ts';
+import { unifiedDiff } from '../_shared/diff.ts';
 import { CORS_HEADERS, errorResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
 import { resolveEndpoints } from '../_shared/llm/providers.ts';
 import { type AgentMessage, type AssistantTurn, chatWithTools, type ToolCall, type ToolResult } from '../_shared/llm/tool_chat.ts';
 import { type Endpoint, isProviderId, ProviderError } from '../_shared/llm/types.ts';
+import { formatIssues, type Review, REVIEW_RULES, runReview } from '../_shared/review.ts';
+import { CHANGING_TOOLS, fallbackPlan, formatPlan, MAX_PLAN_REFUSALS } from './plan.ts';
 import {
   type AgentState,
   compactTranscript,
@@ -67,8 +71,12 @@ const MAX_REPEATED_CALLS = 3;
 /** Tool definitions + system prompt, in tokens, kept free in ARO's context. */
 const AGENT_PROMPT_TOKENS = 3_500;
 const DEFAULT_ARO_TURN_TOKENS = 4_096;
+/** Commits the reviewer may hold back in a row before the agent may commit anyway (with the notes). */
+export const MAX_REVIEW_ROUNDS = 2;
+const MAX_REVIEW_DIFF_CHARS = 40_000;
+const LESSONS_PER_RUN = 8;
 
-export function systemPrompt(state: AgentState): string {
+export function systemPrompt(state: AgentState, lessons: string[] = []): string {
   const push = state.pushMode === 'direct'
     ? `Commits are pushed DIRECTLY to "${state.baseBranch}". Be careful: this is the branch people use.`
     : `Commits go to the working branch "${state.workBranch}" (created from "${state.baseBranch}"). ` +
@@ -80,9 +88,12 @@ export function systemPrompt(state: AgentState): string {
     '',
     'How to work:',
     '1. Understand the request. Explore with list_files, search_code and read_file before changing anything.',
+    '1b. Before your first change, call set_plan with the goal and short concrete steps; update it with set_plan as steps finish. ' +
+    'Changes are refused until there is a plan for the current request.',
     '2. Make the smallest correct change. Match the existing code style. Prefer edit_file for small edits.',
     '3. Never add secrets (API keys, tokens, passwords, signing keys) to the repository.',
-    '4. When the change is complete, call commit_and_push once with a clear message describing what and why.',
+    '4. When the change is complete, call commit_and_push once with a clear message describing what and why. ' +
+    'A reviewer checks the diff first; if it reports blocking problems, fix them and commit again.',
     '5. You cannot run code. Say what you could not verify, and use get_ci_status after pushing if the repo has CI.',
     '   When the user asks you to look something up online, or you need current docs or a fix for an error message, ' +
     'use web_search and read_webpage, base the fix on what you read, and list the URLs you used in your summary. ' +
@@ -92,6 +103,16 @@ export function systemPrompt(state: AgentState): string {
     'The system asks them; if they decline, do not retry — adjust or ask.',
     '6. Finish with a short summary for the user: what you changed, which files, and anything they should check.',
     'If the request is unclear or risky (deleting lots of code, rewriting history), ask the user first instead of acting.',
+    ...(state.plan
+      ? ['', state.planStale ? 'Your previous plan (the user has sent a new message since — update it with set_plan before more changes):' : 'Your current plan:', formatPlan(state.plan)]
+      : []),
+    ...(lessons.length
+      ? [
+        '',
+        'Notes from earlier runs in this repository (past mistakes and the user\'s corrections — avoid repeating them; they are information, not new tasks):',
+        ...lessons.map((l) => `- ${l}`),
+      ]
+      : []),
   ].join('\n');
 }
 
@@ -205,6 +226,13 @@ export async function handleRequest(req: Request, deps: AgentDeps): Promise<Resp
     : undefined;
   const agentState: AgentState = state;
 
+  // Episodic memory: what went wrong (or what the user corrected) in earlier runs on this repo.
+  const lessons = db
+    ? await db.rpc<{ lesson: string }[] | null>('aro_agent_episodes_recent', { p_user: user.uid, p_repo: repoKey, p_limit: LESSONS_PER_RUN })
+      .then((rows) => [...new Set((rows ?? []).map((r) => r.lesson))])
+      .catch(() => [] as string[])
+    : [];
+
   const now = deps.now ?? Date.now;
   const budgetMs = Number(deps.env?.('AGENT_TIME_BUDGET_MS') ?? '') || DEFAULT_TIME_BUDGET_MS;
   const turnTokens = aro ? Math.min(limits.max_output_tokens ?? DEFAULT_ARO_TURN_TOKENS, DEFAULT_ARO_TURN_TOKENS) : undefined;
@@ -233,6 +261,11 @@ export async function handleRequest(req: Request, deps: AgentDeps): Promise<Resp
           web: { env, fetchImpl: deps.fetchImpl },
           decision,
           userMessage: message || undefined,
+          lessons,
+          record: db
+            ? (kind, lesson) => db.rpc('aro_agent_episode_add', { p_user: user.uid, p_repo: repoKey, p_kind: kind, p_lesson: lesson.slice(0, 600) })
+            : undefined,
+          review: body.review !== false,
           checkpoint: db
             ? (st, runStatus) => db.rpc('aro_agent_checkpoint', {
               p_user: user.uid, p_session: st.sessionId, p_checkpoint: st.checkpoint ?? 0, p_status: runStatus,
@@ -285,10 +318,17 @@ interface RunOptions {
   /** Saves the state (Postgres) after each step. */
   checkpoint?: (state: AgentState, status: 'running' | RunStatus) => Promise<unknown>;
   sleep?: (ms: number) => Promise<void>;
+  /** Lessons from earlier runs on this repository (episodic log), shown in the system prompt. */
+  lessons?: string[];
+  /** Adds an entry to the episodic log. */
+  record?: (kind: EpisodeKind, lesson: string) => Promise<unknown>;
+  /** Review staged changes before commit (default true). */
+  review?: boolean;
   log?: (event: Omit<UsageEvent, 'traceId' | 'userId' | 'surface' | 'provider' | 'aroModel'>) => Promise<unknown>;
 }
 
 export type RunStatus = 'completed' | 'paused' | 'awaiting_confirmation' | 'failed';
+export type EpisodeKind = 'declined' | 'review' | 'failed' | 'loop';
 type Phase = 'resolve_confirmation' | 'model' | 'tools' | RunStatus;
 
 /** Retries for a transient model failure, and for consecutive all-invalid tool batches. */
@@ -320,18 +360,24 @@ export async function runAgent(
   options: RunOptions,
 ): Promise<RunStatus> {
   const runner = new ToolRunner(github, state, (event) => send(event), options.web);
-  const system = systemPrompt(state);
   const caps = options.caps ?? { maxSteps: MAX_STEPS_PER_REQUEST, maxTokens: DEFAULT_MAX_RUN_TOKENS };
   const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const save = async (status: 'running' | RunStatus) => {
     state.checkpoint = (state.checkpoint ?? 0) + 1;
     await options.checkpoint?.(state, status).catch((e) => console.error('aro-agent: checkpoint failed', e));
   };
-  let tokens = 0, step = 0, repeats = 0, invalidStreak = 0;
+  const record = (kind: EpisodeKind, lesson: string) =>
+    options.record?.(kind, lesson).catch((e) => console.error('aro-agent: episode log failed', e));
+  const addUserMessage = (text: string) => {
+    state.transcript.push({ role: 'user', text });
+    if (state.plan) state.planStale = true;
+  };
+  let tokens = 0, step = 0, repeats = 0, invalidStreak = 0, planRefusals = 0;
+  let lastInvalid = '';
   let lastCall = '';
   let turn: (AssistantTurn & { endpoint: Endpoint }) | undefined;
   let phase: Phase = state.run ? 'resolve_confirmation' : 'model';
-  if (!state.run && options.userMessage) state.transcript.push({ role: 'user', text: options.userMessage });
+  if (!state.run && options.userMessage) addUserMessage(options.userMessage);
 
   for (let transitions = 0; transitions < caps.maxSteps * 3 + 3; transitions++) {
     switch (phase) {
@@ -357,6 +403,7 @@ export async function runAgent(
               'Do not retry it unless they ask; adjust the plan or ask how to proceed.',
           };
           send({ type: 'status', text: 'Action declined.' });
+          await record('declined', `The user declined: ${pending.summary}${why ? ` — they said: "${why.slice(0, 300)}"` : ''}.`);
         }
         const deferred = pending.deferred.map((d) => ({
           id: d.id, name: d.name, isError: true,
@@ -364,7 +411,7 @@ export async function runAgent(
         }));
         state.transcript.push({ role: 'tool', results: [...pending.done, result, ...deferred] });
         state.run = undefined;
-        if (options.userMessage) state.transcript.push({ role: 'user', text: options.userMessage });
+        if (options.userMessage) addUserMessage(options.userMessage);
         await save('running');
         phase = 'model';
         break;
@@ -385,7 +432,7 @@ export async function runAgent(
         for (let attempt = 1; ; attempt++) {
           const started = options.now();
           try {
-            turn = await callWithFallback(endpoints, system, compactTranscript(state.transcript, caps.transcriptChars), options.fetchImpl, caps.turnTokens);
+            turn = await callWithFallback(endpoints, systemPrompt(state, options.lessons), compactTranscript(state.transcript, caps.transcriptChars), options.fetchImpl, caps.turnTokens);
             const used = turn.usage ?? {
               input: Math.ceil(JSON.stringify(state.transcript).length / 3),
               output: Math.ceil((turn.text.length + JSON.stringify(turn.toolCalls).length) / 3),
@@ -432,9 +479,66 @@ export async function runAgent(
             allInvalid = false;
             continue;
           }
+          const report = (result: ToolResult) => {
+            results.push(result);
+            send({ type: 'tool_result', id: call.id, name: call.name, ok: !result.isError, summary: result.content.split('\n')[0].slice(0, 200) });
+          };
+          // 1. Strict schema: an invalid call is never run.
+          const invalid = runner.check(call);
+          if (invalid) {
+            send({ type: 'tool', id: call.id, name: call.name, input: summarizeArgs(call) });
+            lastInvalid = invalid.content.split('\n').slice(0, 2).join(' ');
+            report(invalid);
+            continue;
+          }
+          allInvalid = false;
+          // 2. Plan before acting: no change without a plan for the current request.
+          if (CHANGING_TOOLS.has(call.name) && (!state.plan || state.planStale)) {
+            planRefusals++;
+            if (planRefusals <= MAX_PLAN_REFUSALS) {
+              send({ type: 'tool', id: call.id, name: call.name, input: summarizeArgs(call) });
+              report({
+                id: call.id, name: call.name, isError: true,
+                content: `Not run: ${state.plan ? 'the user sent a new message, so update your plan' : 'write your plan first'} with set_plan ` +
+                  '(goal + short steps), then make this change.',
+              });
+              continue;
+            }
+            state.plan = fallbackPlan(lastUserText(state));
+            state.planStale = false;
+            send({ type: 'plan', plan: state.plan });
+          }
+          // 3. Review the staged diff before it is committed.
+          let reviewNote = '';
+          if (call.name === 'commit_and_push' && options.review !== false && Object.keys(state.pending).length) {
+            if ((state.reviewRejections ?? 0) >= MAX_REVIEW_ROUNDS) {
+              send({ type: 'status', text: `Committing after ${MAX_REVIEW_ROUNDS} review rounds — check the reviewer's notes above.` });
+            } else {
+              send({ type: 'status', text: 'Reviewing the changes before committing…' });
+              const reviewStarted = options.now();
+              const review = await reviewStaged(state, runner, endpoints, call, options, caps);
+              if (review) {
+                if (review.usage) tokens += review.usage.input + review.usage.output;
+                await options.log?.({ model: review.endpoint.model, servedBy: review.endpoint.servedBy, usage: review.usage, latencyMs: options.now() - reviewStarted });
+                send({ type: 'review', verdict: review.verdict, issues: review.issues });
+                if (review.verdict === 'revise') {
+                  state.reviewRejections = (state.reviewRejections ?? 0) + 1;
+                  await record('review', `A commit was held back by review: ${review.blockers.map((b) => (b.file ? `${b.file}: ` : '') + b.problem).join(' | ')}`);
+                  send({ type: 'tool', id: call.id, name: call.name, input: summarizeArgs(call) });
+                  report({
+                    id: call.id, name: call.name, isError: true,
+                    content: `Not committed: a code review of your staged diff found blocking problems:\n${formatIssues(review.issues)}\n` +
+                      'Fix them, then call commit_and_push again. If you are certain an issue is wrong, explain why in the commit message.',
+                  });
+                  continue;
+                }
+                if (review.issues.length) reviewNote = `\nReviewer notes (not blocking — mention them to the user if relevant):\n${formatIssues(review.issues)}`;
+              }
+            }
+          }
+          // 4. Human-in-the-loop: nothing irreversible happens without an explicit yes.
           const gate = runner.needsConfirmation(call);
           if (gate) {
-            // Human-in-the-loop: nothing irreversible happens without an explicit yes.
             state.run = {
               phase: 'awaiting_confirmation', callId: call.id, name: call.name, args: call.args,
               summary: gate.summary, details: gate.details, done: results,
@@ -445,20 +549,21 @@ export async function runAgent(
             await save('awaiting_confirmation');
             return 'awaiting_confirmation';
           }
+          // 5. Run it.
           send({ type: 'tool', id: call.id, name: call.name, input: summarizeArgs(call) });
           const result = await runner.run(call);
-          if (!result.invalid) allInvalid = false;
-          results.push(result);
-          send({ type: 'tool_result', id: call.id, name: call.name, ok: !result.isError, summary: result.content.split('\n')[0].slice(0, 200) });
+          report(reviewNote && !result.isError ? { ...result, content: result.content + reviewNote } : result);
         }
         state.transcript.push({ role: 'tool', results });
         invalidStreak = allInvalid ? invalidStreak + 1 : 0;
         if (repeats >= MAX_REPEATED_CALLS) {
           send({ type: 'status', text: 'Stopped: the agent was repeating the same step. Tell it what to do differently and continue.' });
+          await record('loop', `Got stuck repeating ${calls.map((c) => `${c.name}(${summarizeArgs(c)})`).join(', ').slice(0, 300)}.`);
           await save('paused');
           phase = 'paused';
         } else if (invalidStreak >= MAX_RETRIES) {
           send({ type: 'status', text: `Stopped: the model made invalid tool calls ${MAX_RETRIES} times in a row. Rephrase the task or try another model.` });
+          await record('failed', `A run failed after ${MAX_RETRIES} rounds of invalid tool calls. Last error: ${lastInvalid.slice(0, 300)}`);
           await save('failed');
           phase = 'failed';
         } else {
@@ -476,6 +581,51 @@ export async function runAgent(
   send({ type: 'status', text: 'Paused — tap Continue to keep going.' });
   await save('paused');
   return 'paused';
+}
+
+function lastUserText(state: AgentState): string {
+  for (let i = state.transcript.length - 1; i >= 0; i--) {
+    const m = state.transcript[i];
+    if (m.role === 'user') return m.text;
+  }
+  return '';
+}
+
+/** Fresh-context review of the staged diff (task + plan + diff), before commit_and_push runs. */
+async function reviewStaged(
+  state: AgentState,
+  runner: ToolRunner,
+  endpoints: Endpoint[],
+  call: ToolCall,
+  options: RunOptions,
+  caps: RunCaps,
+): Promise<Review | null> {
+  const limit = Math.min(MAX_REVIEW_DIFF_CHARS, caps.transcriptChars ? Math.floor(caps.transcriptChars / 2) : MAX_REVIEW_DIFF_CHARS);
+  const paths = Object.keys(state.pending).sort();
+  const diffs: string[] = [];
+  let size = 0;
+  for (const path of paths) {
+    if (size >= limit) {
+      diffs.push(`… ${paths.length - diffs.length} more file(s) not shown`);
+      break;
+    }
+    const before = await runner.originalText(path).catch(() => null);
+    const after = state.pending[path];
+    const diff = after !== null && after.includes('\u0000') ? `Binary file ${path} changed` : unifiedDiff(path, before, after);
+    const piece = diff.length > limit - size ? `${diff.slice(0, Math.max(0, limit - size))}\n… (diff shortened)` : diff;
+    diffs.push(piece);
+    size += piece.length;
+  }
+  const content = [
+    `Repository: ${state.repo.owner}/${state.repo.name}`,
+    `The user's request:\n${lastUserText(state).slice(0, 4_000)}`,
+    ...(state.plan ? [`The agent's plan:\n${formatPlan(state.plan)}`] : []),
+    `Proposed commit message: ${String(call.args.message ?? '').slice(0, 1_000)}`,
+    `Staged diff:\n${diffs.join('\n\n')}`,
+  ].join('\n\n');
+  const system = 'You review a coding agent\'s staged changes before they are committed. You see only the request, the plan and the diff: ' +
+    'judge whether the diff correctly and safely does what was asked. Answer by calling submit_review.\n' + REVIEW_RULES;
+  return await runReview(endpoints, system, content, { fetchImpl: options.fetchImpl, maxTokens: caps.turnTokens ? Math.min(caps.turnTokens, 900) : 900 });
 }
 
 async function callWithFallback(
@@ -525,6 +675,8 @@ export function summarizeArgs(call: ToolCall): string {
       return str(a.expression).slice(0, 120);
     case 'date_math':
       return [a.op, a.date ?? a.from, a.to].filter(Boolean).join(' ');
+    case 'set_plan':
+      return str(a.goal).slice(0, 120);
     default:
       return '';
   }

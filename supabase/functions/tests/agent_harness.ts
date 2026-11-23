@@ -91,28 +91,47 @@ export function githubFetch(repo: FakeRepo, onModel: (body: any) => any) {
   }) as typeof fetch;
 }
 
-/** Fake OpenAI-compatible model that plays back a script of tool calls. */
-export function scriptedModel(script: { text?: string; calls?: { name: string; args: unknown }[] }[]) {
+/** A plan the scripted model sends before its first change. */
+export const PLAN = { name: 'set_plan', args: { goal: 'Do the task', steps: [{ title: 'Make the change', status: 'in_progress' }, { title: 'Commit', status: 'pending' }] } };
+
+export type ScriptedReview = { verdict: 'approve' | 'revise'; issues: { severity: 'blocker' | 'minor'; file?: string; problem: string }[] } | 'fail';
+
+function reply(content: string | null, calls: { name: string; args: unknown }[], turn: number) {
+  return {
+    choices: [{
+      message: {
+        role: 'assistant',
+        content,
+        tool_calls: calls.map((c, i) => ({
+          id: `call_${turn}_${i}`,
+          type: 'function',
+          function: { name: c.name, arguments: JSON.stringify(c.args) },
+        })),
+      },
+    }],
+  };
+}
+
+/**
+ * Fake OpenAI-compatible model that plays back a script of tool calls.
+ * Reviewer requests (offered only submit_review) are answered from `reviews`
+ * instead (default: approve with no issues) and recorded in `reviewsSeen`.
+ */
+export function scriptedModel(script: { text?: string; calls?: { name: string; args: unknown }[] }[], reviews: ScriptedReview[] = []) {
   let turn = 0;
   const seen: any[] = [];
+  const reviewsSeen: any[] = [];
   const handler = (body: any) => {
+    if (body?.tools?.length === 1 && body.tools[0].function?.name === 'submit_review') {
+      reviewsSeen.push(body);
+      const review = reviews.shift() ?? { verdict: 'approve', issues: [] };
+      return review === 'fail' ? reply('I cannot review this.', [], 0) : reply(null, [{ name: 'submit_review', args: review }], 0);
+    }
     seen.push(body);
     const step = script[turn++] ?? { text: 'done' };
-    return {
-      choices: [{
-        message: {
-          role: 'assistant',
-          content: step.text ?? null,
-          tool_calls: (step.calls ?? []).map((c, i) => ({
-            id: `call_${turn}_${i}`,
-            type: 'function',
-            function: { name: c.name, arguments: JSON.stringify(c.args) },
-          })),
-        },
-      }],
-    };
+    return reply(step.text ?? null, step.calls ?? [], turn);
   };
-  return { handler, seen };
+  return { handler, seen, reviewsSeen };
 }
 
 export function request(body: unknown): Request {

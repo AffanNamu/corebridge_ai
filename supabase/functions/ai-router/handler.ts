@@ -39,6 +39,7 @@ import {
   type Usage,
 } from '../_shared/cost.ts';
 import { computeForChat, mentionsDate } from '../_shared/compute.ts';
+import { type Review, REVIEW_RULES, runReview } from '../_shared/review.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
 import {
   LANGUAGE_RULES,
@@ -259,13 +260,29 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
           controller.enqueue(frame);
         }, metaExtra, {
           maxTokens,
-          onText: useCache ? (text) => { if (answer.length <= MAX_CACHED_ANSWER_CHARS) answer += text; } : undefined,
+          onText: (text) => { if (answer.length <= MAX_REVIEWED_ANSWER_CHARS) answer += text; },
         });
         served = result.endpoint;
         usage = result.usage;
         if (sources.length) controller.enqueue(sseFrame({ delta: sourcesMarkdown(sources) }));
         await logUsage(db, { ...logBase, model: served.model, servedBy: served.servedBy, usage, latencyMs: Date.now() - started }, env, deps.fetchImpl);
-        if (useCache && served.servedBy === 'aro' && answer.trim() && answer.length <= MAX_CACHED_ANSWER_CHARS) {
+
+        // Second check for long code answers: a fresh-context review; its findings are appended to the answer.
+        let review: Review | null = null;
+        if (body.review !== false && codeLines(answer) >= CODE_REVIEW_MIN_LINES && (served.kind === 'openai' || served.kind === 'anthropic')) {
+          controller.enqueue(sseFrame({ status: 'Double-checking the code…' }));
+          const reviewStarted = Date.now();
+          review = await runReview([served], CODE_ANSWER_REVIEW_SYSTEM, `The question:\n${lastUserText.slice(0, 6_000)}\n\nThe answer to review:\n${answer}`, {
+            fetchImpl: deps.fetchImpl,
+            maxTokens: 900,
+          });
+          if (review) {
+            await logUsage(db, { ...logBase, model: served.model, servedBy: served.servedBy, usage: review.usage, latencyMs: Date.now() - reviewStarted }, env, deps.fetchImpl);
+            controller.enqueue(sseFrame({ review: { verdict: review.verdict, issues: review.issues } }));
+            if (review.issues.length) controller.enqueue(sseFrame({ delta: reviewMarkdown(review) }));
+          }
+        }
+        if (useCache && !review?.issues.length && served.servedBy === 'aro' && answer.trim() && answer.length <= MAX_CACHED_ANSWER_CHARS) {
           await cachePut(db, key, aro!.aroModel, answer);
         }
       } catch (err) {
@@ -287,6 +304,28 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   });
 
   return new Response(stream, { headers: SSE_HEADERS });
+}
+
+/** Answers with at least this many lines inside code blocks get a second, fresh-context check. */
+export const CODE_REVIEW_MIN_LINES = 30;
+const MAX_REVIEWED_ANSWER_CHARS = 60_000;
+const CODE_ANSWER_REVIEW_SYSTEM = 'You double-check an assistant\'s answer that contains code, before the user relies on it. ' +
+  'Look for real bugs: code that would not run or compile, wrong logic, wrong API usage, missing imports, security problems, ' +
+  'or code that does not do what the question asked. Answer by calling submit_review.\n' + REVIEW_RULES;
+
+/** Lines inside ``` fenced code blocks. */
+export function codeLines(text: string): number {
+  let inside = false, count = 0;
+  for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) inside = !inside;
+    else if (inside && line.trim()) count++;
+  }
+  return count;
+}
+
+export function reviewMarkdown(review: Review): string {
+  const lines = review.issues.map((i) => `- ${i.severity === 'blocker' ? '**Must fix:**' : 'Note:'} ${i.file ? `\`${i.file}\` — ` : ''}${i.problem}`);
+  return `\n\n---\n**Second check** — a review of the code above found:\n${lines.join('\n')}`;
 }
 
 const REPEAT_WINDOW = 400;

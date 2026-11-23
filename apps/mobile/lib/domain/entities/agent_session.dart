@@ -174,6 +174,16 @@ class AgentSession extends Equatable {
     );
   }
 
+  /// The agent's plan for the current request, read from the saved state.
+  AgentPlan? get plan {
+    if (stateJson == null) return null;
+    try {
+      return AgentPlan.fromMap((jsonDecode(stateJson!) as Map<String, dynamic>)['plan']);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// The step waiting for the user's approval (status 'awaiting_confirmation'), read from the saved state.
   PendingApproval? get pendingApproval {
     if (status != 'awaiting_confirmation' || stateJson == null) return null;
@@ -193,6 +203,28 @@ class AgentSession extends Equatable {
 
   @override
   List<Object?> get props => [id, repoOwner, repoName, status, stateJson, timeline, commitCount, pullRequestUrl, updatedAt];
+}
+
+/// The plan the agent writes before changing anything, kept up to date as it works.
+class AgentPlan {
+  final String goal;
+
+  /// (title, status) with status 'pending' | 'in_progress' | 'done' | 'skipped'.
+  final List<({String title, String status})> steps;
+  const AgentPlan({required this.goal, required this.steps});
+
+  int get done => steps.where((s) => s.status == 'done').length;
+
+  static AgentPlan? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final steps = ((raw['steps'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((s) => (title: '${s['title'] ?? ''}', status: '${s['status'] ?? 'pending'}'))
+        .where((s) => s.title.isNotEmpty)
+        .toList();
+    if (steps.isEmpty) return null;
+    return AgentPlan(goal: '${raw['goal'] ?? ''}', steps: steps);
+  }
 }
 
 /// A risky step (opening a pull request, pushing to the base branch, deleting

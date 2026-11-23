@@ -34,6 +34,7 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
   bool _running = false;
   String? _liveStatus;
   CancelToken? _cancelToken;
+  AgentPlan? _plan;
 
   // Settings for the next new session.
   late String _baseBranch = widget.repo.defaultBranch;
@@ -82,6 +83,7 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
         ..clear()
         ..addAll(session.timeline);
       _liveStatus = null;
+      _plan = session.plan;
     });
     _scrollToEnd();
   }
@@ -92,6 +94,7 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
       _session = null;
       _timeline.clear();
       _liveStatus = null;
+      _plan = null;
     });
   }
 
@@ -236,6 +239,24 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
             case 'error':
               status = 'error';
               _timeline.add(AgentTimelineItem(kind: 'error', text: event.text, ok: false, at: at));
+            case 'plan':
+              _plan = AgentPlan.fromMap(event.data['plan']) ?? _plan;
+            case 'review':
+              final issues = ((event.data['issues'] as List?) ?? const []).whereType<Map>().toList();
+              final held = event.data['verdict'] == 'revise';
+              _timeline.add(AgentTimelineItem(
+                kind: 'review',
+                text: held
+                    ? 'Review held the commit back: ${issues.length} problem${issues.length == 1 ? '' : 's'} to fix first'
+                    : issues.isEmpty
+                        ? 'Review passed'
+                        : 'Review passed with ${issues.length} note${issues.length == 1 ? '' : 's'}',
+                detail: issues
+                    .map((i) => '${i['severity'] == 'blocker' ? 'Must fix' : 'Note'}: ${i['file'] != null ? '${i['file']} — ' : ''}${i['problem']}')
+                    .join('\n'),
+                ok: !held,
+                at: at,
+              ));
             case 'confirm':
               final pending = PendingApproval.fromEvent(event.data);
               _timeline.add(AgentTimelineItem(kind: 'confirm', text: pending.summary, detail: pending.details.join('\n'), at: at));
@@ -370,6 +391,7 @@ class _RepoAgentScreenState extends ConsumerState<RepoAgentScreen> {
       ),
       body: Column(
         children: [
+          if (_plan != null) _PlanCard(plan: _plan!),
           Expanded(
             child: _timeline.isEmpty && _session == null
                 ? _buildIntro()
@@ -553,6 +575,11 @@ class _TimelineTile extends StatelessWidget {
     'commit_and_push': ('Committed & pushed', Icons.cloud_upload_outlined),
     'create_pull_request': ('Opened pull request', Icons.merge_type_rounded),
     'get_ci_status': ('Checked CI', Icons.fact_check_outlined),
+    'set_plan': ('Updated plan', Icons.checklist_rounded),
+    'web_search': ('Searched the web', Icons.travel_explore_rounded),
+    'read_webpage': ('Read', Icons.public_rounded),
+    'calculate': ('Calculated', Icons.calculate_outlined),
+    'date_math': ('Worked out dates', Icons.event_outlined),
   };
 
   Future<void> _open(String? url) async {
@@ -625,6 +652,34 @@ class _TimelineTile extends StatelessWidget {
                 : Text(item.detail!, style: const TextStyle(color: AppColors.textMuted, fontFamily: 'monospace', fontSize: 12)),
             trailing: item.url == null ? null : const Icon(Icons.open_in_new_rounded, size: 18, color: AppColors.textMuted),
             onTap: () => _open(item.url),
+          ),
+        );
+      case 'review':
+        final color = item.ok ? Colors.greenAccent : Colors.amberAccent;
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(item.ok ? Icons.verified_outlined : Icons.rate_review_outlined, size: 18, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item.text, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600))),
+                ],
+              ),
+              if ((item.detail ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(item.detail!, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ),
+            ],
           ),
         );
       case 'confirm':
@@ -714,6 +769,70 @@ class _ApprovalCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The agent's plan, collapsed to one line by default.
+class _PlanCard extends StatelessWidget {
+  final AgentPlan plan;
+  const _PlanCard({required this.plan});
+
+  static const _icons = {
+    'done': (Icons.check_circle_rounded, Colors.greenAccent),
+    'in_progress': (Icons.radio_button_checked_rounded, AppColors.accentBlue),
+    'skipped': (Icons.remove_circle_outline_rounded, AppColors.textMuted),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppColors.accentBlue.withValues(alpha: 0.3)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          dense: true,
+          leading: const Icon(Icons.checklist_rounded, color: AppColors.accentBlue, size: 20),
+          title: Text(
+            'Plan · ${plan.done}/${plan.steps.length} done',
+            style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          subtitle: Text(plan.goal, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          children: [
+            for (final step in plan.steps)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      _icons[step.status]?.$1 ?? Icons.radio_button_unchecked_rounded,
+                      size: 16,
+                      color: _icons[step.status]?.$2 ?? AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        step.title,
+                        style: TextStyle(
+                          color: step.status == 'done' ? AppColors.textMuted : AppColors.textPrimary,
+                          decoration: step.status == 'skipped' ? TextDecoration.lineThrough : null,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

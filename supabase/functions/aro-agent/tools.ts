@@ -7,6 +7,7 @@ import type { ToolCall, ToolDefinition, ToolResult } from '../_shared/llm/tool_c
 import { CALC_TOOLS, runCalcTool } from '../_shared/calc.ts';
 import { type JsonSchema, validate } from '../_shared/schema.ts';
 import { readPage, type WebDeps, webSearch } from '../_shared/web.ts';
+import { PLAN_TOOL, planFromArgs } from './plan.ts';
 import type { AgentState } from './state.ts';
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -95,12 +96,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
   },
   ...CALC_TOOLS,
+  PLAN_TOOL,
 ];
 
 const TOOLS_BY_NAME = new Map(TOOL_DEFINITIONS.map((t) => [t.name, t]));
 
 /** Tools that only read: safe to retry automatically on a transient GitHub/network error. */
 const READ_ONLY = new Set(['list_files', 'read_file', 'search_code', 'get_ci_status', 'web_search', 'read_webpage']);
+
 const MAX_TOOL_RETRIES = 3;
 
 /** Paths whose changes always need the user's confirmation (CI, secrets, infrastructure, database migrations). */
@@ -118,7 +121,8 @@ const MAX_LIST = 800;
 /** Events the tool runner reports to the app as they happen. */
 export type ToolEvent =
   | { type: 'commit'; sha: string; url: string; branch: string; message: string; files: string[] }
-  | { type: 'pull_request'; number: number; url: string };
+  | { type: 'pull_request'; number: number; url: string }
+  | { type: 'plan'; plan: AgentState['plan'] };
 
 export class ToolRunner {
   private tree: TreeEntry[] | null = null;
@@ -142,18 +146,8 @@ export class ToolRunner {
    * model can fix (`invalid: true`). Read-only tools retry transient failures.
    */
   async run(call: ToolCall): Promise<ToolResult> {
-    const def = TOOLS_BY_NAME.get(call.name);
-    if (!def) return { id: call.id, name: call.name, content: `Unknown tool "${call.name}".`, isError: true, invalid: true };
-    if ('_invalid_json' in call.args) {
-      return { id: call.id, name: call.name, content: 'The arguments were not valid JSON. Send a JSON object that matches the tool schema.', isError: true, invalid: true };
-    }
-    const problems = validate(def.parameters as JsonSchema, call.args);
-    if (problems.length) {
-      return {
-        id: call.id, name: call.name, isError: true, invalid: true,
-        content: `Invalid arguments for ${call.name}, so it was not run:\n- ${problems.join('\n- ')}\nFix them and call it again.`,
-      };
-    }
+    const invalid = this.check(call);
+    if (invalid) return invalid;
     for (let attempt = 1; ; attempt++) {
       try {
         return { id: call.id, name: call.name, content: await this.dispatch(call) };
@@ -167,6 +161,28 @@ export class ToolRunner {
         return { id: call.id, name: call.name, content: message, isError: true };
       }
     }
+  }
+
+  /** Schema check only: an error result for an invalid call, or null when it may run. */
+  check(call: ToolCall): ToolResult | null {
+    const def = TOOLS_BY_NAME.get(call.name);
+    if (!def) return { id: call.id, name: call.name, content: `Unknown tool "${call.name}".`, isError: true, invalid: true };
+    if ('_invalid_json' in call.args) {
+      return { id: call.id, name: call.name, content: 'The arguments were not valid JSON. Send a JSON object that matches the tool schema.', isError: true, invalid: true };
+    }
+    const problems = validate(def.parameters as JsonSchema, call.args);
+    if (problems.length) {
+      return {
+        id: call.id, name: call.name, isError: true, invalid: true,
+        content: `Invalid arguments for ${call.name}, so it was not run:\n- ${problems.join('\n- ')}\nFix them and call it again.`,
+      };
+    }
+    return null;
+  }
+
+  /** The file as it is on GitHub (before staged edits), or null if it doesn't exist there. */
+  async originalText(path: string): Promise<string | null> {
+    return await this.github.readFile(path, this.readRef);
   }
 
   /**
@@ -230,6 +246,13 @@ export class ToolRunner {
       case 'calculate':
       case 'date_math':
         return runCalcTool(call.name, args);
+      case 'set_plan': {
+        this.state.plan = planFromArgs(args);
+        this.state.planStale = false;
+        this.emit({ type: 'plan', plan: this.state.plan });
+        const done = this.state.plan.steps.filter((s) => s.status === 'done').length;
+        return `Plan saved (${done}/${this.state.plan.steps.length} steps done). Keep it updated with set_plan as you finish steps.`;
+      }
       default:
         throw new Error(`Unknown tool: ${call.name}`);
     }
@@ -368,6 +391,7 @@ export class ToolRunner {
 
     const commit = await this.github.commitChanges(this.state.workBranch, message, changes, modes);
     this.state.pending = {};
+    this.state.reviewRejections = 0;
     this.tree = null;
     this.state.commits.push({ sha: commit.sha, url: commit.url, message, files: paths });
     this.emit({ type: 'commit', ...commit, branch: this.state.workBranch, message, files: paths });

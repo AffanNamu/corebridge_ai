@@ -44,7 +44,7 @@ Status: ✅ in place · 🟡 partial · ❌ missing
 |---|---|---|
 | Short-term | Chat: `fitToContext` **drops** the oldest messages at the context limit. Agent: `compactTranscript` shortens old tool output and drops old exchanges. No summarisation, and no 70% trigger. | 🟡 |
 | Long-term semantic | None. Conversations are stored in Firestore, but nothing is remembered across chats (preferences, facts, rules). | ❌ |
-| Episodic / procedural | 👍/👎 ratings and corrections are stored, but used only **offline for training**. The agent keeps no log of its failures, and nothing is checked before a task. | ❌ |
+| Episodic / procedural | **Phase 2 (agent, done):** `aro_agent_episodes` (per user and repository, service_role only, RLS on) logs declined actions with the user's reason, commits held back by review, loops, and failed runs. The newest 8 are put in the agent's system prompt at the start of every run on that repository. The newest 50 per repository are kept, for 90 days at most. **Still open:** CI failures after a push, chat 👎 corrections, and similarity search (Phase 3, with embeddings). | 🟡 |
 
 **What to build:**
 - **Rolling summary:** at about 70% of the model's context, summarise the oldest turns into a pinned "conversation so far" message, kept in the conversation document so it's computed once. Same for the agent transcript, replacing truncation with a summary of earlier steps.
@@ -60,8 +60,8 @@ Status: ✅ in place · 🟡 partial · ❌ missing
 
 | Pattern | Today | Status |
 |---|---|---|
-| Plan-and-solve | The agent goes straight into tool calls. The system prompt says "explore first", but nothing enforces it. | ❌ |
-| Evaluator-optimizer | No critic at runtime. The **offline** quality gate (`evaluate.py`) stops weaker *model versions*, not weak *answers*. | ❌ |
+| Plan-and-solve | **Phase 2 (done):** the agent explores freely, then must call `set_plan` (goal + up to 12 steps, schema-validated) before any change: `write_file`, `edit_file`, `delete_file`, `commit_and_push` and `create_pull_request` are refused until a plan exists for the current request. A new user message makes the plan stale until it is updated. The plan is repeated in the system prompt every turn, and the app shows it as a live checklist. A model that never plans gets a minimal plan from the task after 2 refusals, so the run never stalls. | ✅ |
+| Evaluator-optimizer | **Phase 2 (done):** before `commit_and_push` runs, a fresh-context reviewer (same model, strict rubric in `_shared/review.ts`) sees the request, the plan and the real unified diff (`_shared/diff.ts`), and answers through a schema-validated `submit_review`. Blocking problems hold the commit back and go to the agent to fix, for up to 2 rounds, then it may commit with the notes attached. Minor notes are passed on. A reviewer that errors never blocks. In chat, answers with 30+ lines of code get the same second check, and its findings are appended under the answer; answers with findings are not cached. The **offline** quality gate (`evaluate.py`) still guards model versions. **Limit:** a 4B reviewer catches obvious flaws only. | ✅ |
 
 **What to build:**
 - **Planning step** in the agent before any tool runs:
@@ -117,7 +117,7 @@ Each phase builds on the one before and ships independently, with tests.
 | Phase | Build | Why first | Size |
 |---|---|---|---|
 | **1. Foundation** ✅ (guided JSON still open) | Agent state machine + Postgres checkpoints + confirmation gates · strict schema validation of tool calls (+ guided JSON for ARO) · deterministic `calculate` / `date_math` tools for the agent and chat | Everything else (plans, critics, sandbox steps, retries) plugs into the state machine. Schemas stop malformed calls today. Calculator and date tools remove a whole class of hallucination cheaply. | M |
-| **2. Plan and critique** | JSON plan step (shown to the user; it becomes the step list) · critic before commit and for long code answers · episodic log of agent failures and corrections, checked before runs | Needs the Phase 1 state machine. It turns the agent from act-first into plan → act → check. | M |
+| **2. Plan and critique** ✅ (similarity search for episodes moves to Phase 3) | JSON plan step (shown to the user; it becomes the step list) · critic before commit and for long code answers · episodic log of agent failures and corrections, checked before runs | Needs the Phase 1 state machine. It turns the agent from act-first into plan → act → check. | M |
 | **3. Knowledge and memory** | `pgvector` + `pg_trgm` knowledge store · real Knowledge Base (upload, chunk, embed) · strict-RAG router with confidence threshold · citation verifier · rolling summaries at 70% · long-term `memories` with consent | The largest piece, and it needs product decisions: which domains count as "ours", and the memory consent design. | L |
 | **4. Real execution** | Sandbox runner (RunPod CPU serverless) + `run_in_sandbox` · tests run in `VERIFY_STEP` before commit · Python for heavy data and maths | Needs infrastructure and a vendor or isolation decision. Plugs into the Phase 1 state machine. | M–L |
 

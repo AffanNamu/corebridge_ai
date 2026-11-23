@@ -106,4 +106,18 @@ void main() {
     expect(session.copyWith(stateJson: '{"run":null}').pendingApproval, isNull);
     expect(session.copyWith(stateJson: 'not json').pendingApproval, isNull);
   });
+
+  test('AgentSession reads the plan from its state', () {
+    final at = DateTime.fromMillisecondsSinceEpoch(1000);
+    final session = AgentSession(
+      id: 's', ownerId: 'u', repoOwner: 'o', repoName: 'r', title: 't', baseBranch: 'main', pushMode: 'branch',
+      stateJson: '{"plan":{"goal":"Fix login","steps":[{"title":"Find the bug","status":"done"},{"title":"Fix it","status":"in_progress"}]}}',
+      createdAt: at, updatedAt: at,
+    );
+    expect(session.plan!.goal, 'Fix login');
+    expect(session.plan!.done, 1);
+    expect(session.plan!.steps.last.status, 'in_progress');
+    expect(AgentPlan.fromMap({'goal': 'x', 'steps': []}), isNull);
+    expect(session.copyWith(stateJson: '{}').plan, isNull);
+  });
 }

@@ -6,7 +6,7 @@ import { assert, assertEquals, assertStringIncludes, assertThrows } from 'jsr:@s
 import { handleRequest } from '../aro-agent/handler.ts';
 import { calculate, dateMath, formatNumber, runCalcTool } from '../_shared/calc.ts';
 import { validate } from '../_shared/schema.ts';
-import { base, events, fakeRepo, githubFetch, request, scriptedModel, verify } from './agent_harness.ts';
+import { base, events, fakeRepo, githubFetch, PLAN, request, scriptedModel, verify } from './agent_harness.ts';
 import { testDb } from './pg.ts';
 
 const pg = { sanitizeResources: false, sanitizeOps: false };
@@ -118,7 +118,7 @@ Deno.test('a transient model failure is retried with backoff (max 3 attempts)', 
 Deno.test('declining a gated action: nothing happens, the model is told, later calls in the batch are not run', async () => {
   const repo = fakeRepo({ 'a.txt': 'x\n', 'old.txt': 'bye\n' });
   const model = scriptedModel([
-    { calls: [{ name: 'delete_file', args: { path: 'old.txt' } }] },
+    { calls: [PLAN, { name: 'delete_file', args: { path: 'old.txt' } }] },
     { calls: [{ name: 'commit_and_push', args: { message: 'Remove old.txt' } }, { name: 'get_ci_status', args: {} }] },
     { text: 'Understood, I left it alone.' },
   ]);
@@ -142,7 +142,7 @@ Deno.test('declining a gated action: nothing happens, the model is told, later c
 Deno.test('a new message while an action waits counts as "not approved" and is passed on', async () => {
   const repo = fakeRepo({ '.github/workflows/ci.yml': 'on: push\n' });
   const model = scriptedModel([
-    { calls: [{ name: 'write_file', args: { path: '.github/workflows/ci.yml', content: 'on: pull_request\n' } }] },
+    { calls: [PLAN, { name: 'write_file', args: { path: '.github/workflows/ci.yml', content: 'on: pull_request\n' } }] },
     { calls: [{ name: 'commit_and_push', args: { message: 'CI on PRs only' } }] },
     { text: 'OK, not changing CI.' },
   ]);

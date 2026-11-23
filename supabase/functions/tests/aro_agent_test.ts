@@ -4,6 +4,7 @@ import { compactTranscript, createState, newWorkBranch, parseState } from '../ar
 import { findSecrets, safePath } from '../aro-agent/tools.ts';
 import { readSseData } from '../_shared/http.ts';
 import { testDb } from './pg.ts';
+import { PLAN, scriptedModel } from './agent_harness.ts';
 import { toAnthropicMessages, toOpenAIMessages, type AgentMessage } from '../_shared/llm/tool_chat.ts';
 
 // ------------------------------------------------------------ fake GitHub
@@ -94,29 +95,6 @@ function githubFetch(repo: FakeRepo, onModel: (body: any) => any) {
   }) as typeof fetch;
 }
 
-/** Fake OpenAI-compatible model that plays back a script of tool calls. */
-function scriptedModel(script: { text?: string; calls?: { name: string; args: unknown }[] }[]) {
-  let turn = 0;
-  const seen: any[] = [];
-  const handler = (body: any) => {
-    seen.push(body);
-    const step = script[turn++] ?? { text: 'done' };
-    return {
-      choices: [{
-        message: {
-          role: 'assistant',
-          content: step.text ?? null,
-          tool_calls: (step.calls ?? []).map((c, i) => ({
-            id: `call_${turn}_${i}`,
-            type: 'function',
-            function: { name: c.name, arguments: JSON.stringify(c.args) },
-          })),
-        },
-      }],
-    };
-  };
-  return { handler, seen };
-}
 
 function request(body: unknown): Request {
   return new Request('http://localhost/aro-agent', {
@@ -150,7 +128,7 @@ Deno.test('agent fixes a bug, pushes one commit to a new branch and opens a PR',
   const model = scriptedModel([
     { calls: [{ name: 'list_files', args: {} }] },
     { calls: [{ name: 'read_file', args: { path: 'src/math.js' } }] },
-    { text: 'Found it.', calls: [{ name: 'edit_file', args: { path: 'src/math.js', old_text: 'a - b', new_text: 'a + b' } }] },
+    { text: 'Found it.', calls: [PLAN, { name: 'edit_file', args: { path: 'src/math.js', old_text: 'a - b', new_text: 'a + b' } }] },
     { calls: [{ name: 'commit_and_push', args: { message: 'Fix add() to sum its arguments' } }] },
     { calls: [{ name: 'create_pull_request', args: { title: 'Fix add()', body: 'add() subtracted.' } }] },
     { text: 'Fixed add() in src/math.js and opened PR #7.' },
@@ -202,7 +180,7 @@ Deno.test('agent fixes a bug, pushes one commit to a new branch and opens a PR',
 Deno.test('session state round-trips: a follow-up message continues on the same branch', async () => {
   const repo = fakeRepo({ 'a.txt': 'one\n' });
   const first = scriptedModel([
-    { calls: [{ name: 'write_file', args: { path: 'a.txt', content: 'two\n' } }] },
+    { calls: [PLAN, { name: 'write_file', args: { path: 'a.txt', content: 'two\n' } }] },
     { calls: [{ name: 'commit_and_push', args: { message: 'one -> two' } }] },
     { text: 'Done.' },
   ]);
@@ -214,7 +192,7 @@ Deno.test('session state round-trips: a follow-up message continues on the same 
 
   const second = scriptedModel([
     { calls: [{ name: 'read_file', args: { path: 'a.txt' } }] },
-    { calls: [{ name: 'write_file', args: { path: 'a.txt', content: 'three\n' } }] },
+    { calls: [PLAN, { name: 'write_file', args: { path: 'a.txt', content: 'three\n' } }] },
     { calls: [{ name: 'commit_and_push', args: { message: 'two -> three' } }] },
     { text: 'Done again.' },
   ]);
@@ -233,7 +211,7 @@ Deno.test('session state round-trips: a follow-up message continues on the same 
 Deno.test('direct push mode commits to the base branch', async () => {
   const repo = fakeRepo({ 'a.txt': 'x\n' });
   const model = scriptedModel([
-    { calls: [{ name: 'write_file', args: { path: 'a.txt', content: 'y\n' } }, { name: 'commit_and_push', args: { message: 'x -> y' } }] },
+    { calls: [PLAN, { name: 'write_file', args: { path: 'a.txt', content: 'y\n' } }, { name: 'commit_and_push', args: { message: 'x -> y' } }] },
     { text: 'ok' },
   ]);
   const first = await events(await handleRequest(request({ ...base, message: 'go', pushMode: 'direct' }), {
@@ -254,7 +232,7 @@ Deno.test('direct push mode commits to the base branch', async () => {
 Deno.test('secrets are never committed', async () => {
   const repo = fakeRepo({ 'a.txt': 'x\n' });
   const model = scriptedModel([
-    { calls: [{ name: 'write_file', args: { path: 'config.js', content: 'const key = "sk-proj-' + 'a'.repeat(40) + '";' } }] },
+    { calls: [PLAN, { name: 'write_file', args: { path: 'config.js', content: 'const key = "sk-proj-' + 'a'.repeat(40) + '";' } }] },
     { calls: [{ name: 'commit_and_push', args: { message: 'add key' } }] },
     { text: 'could not commit' },
   ]);
@@ -312,14 +290,14 @@ Deno.test('runs pause at the time budget and can continue', async () => {
 Deno.test('edit_file reports helpful errors', async () => {
   const repo = fakeRepo({ 'a.txt': 'same\nsame\n' });
   const model = scriptedModel([
-    { calls: [{ name: 'edit_file', args: { path: 'a.txt', old_text: 'same', new_text: 'x' } }, { name: 'edit_file', args: { path: 'a.txt', old_text: 'nope', new_text: 'x' } }, { name: 'read_file', args: { path: '../etc/passwd' } }] },
+    { calls: [PLAN, { name: 'edit_file', args: { path: 'a.txt', old_text: 'same', new_text: 'x' } }, { name: 'edit_file', args: { path: 'a.txt', old_text: 'nope', new_text: 'x' } }, { name: 'read_file', args: { path: '../etc/passwd' } }] },
     { text: 'ok' },
   ]);
   const out = await events(await handleRequest(request({ ...base, message: 'edit' }), {
     verify,
     fetchImpl: githubFetch(repo, model.handler),
   }));
-  const results = out.filter((e) => e.type === 'tool_result');
+  const results = out.filter((e) => e.type === 'tool_result' && e.name !== 'set_plan');
   assertStringIncludes(results[0].summary, 'appears 2 times');
   assertStringIncludes(results[1].summary, 'was not found');
   assertStringIncludes(results[2].summary, 'Invalid path');
