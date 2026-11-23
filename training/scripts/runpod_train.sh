@@ -66,7 +66,11 @@ status starting "setting up"
 say "GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo none)"
 
 # ------------------------------------------------------------------- code
-if [ -d "$REPO/.git" ]; then git -C "$REPO" pull --ff-only; else git clone --depth 1 -b aro-ai-v1 https://github.com/AffanNamu/corebridge_ai "$REPO"; fi
+# The repository is private: without credentials git must fail fast, not wait for a password.
+export GIT_TERMINAL_PROMPT=0
+if [ "${ARO_SKIP_PULL:-}" = "1" ]; then say "using the code already on the volume"
+elif [ -d "$REPO/.git" ]; then git -C "$REPO" pull --ff-only || say "could not update the code — using the copy on the volume"
+else git clone --depth 1 -b aro-ai-v1 https://github.com/AffanNamu/corebridge_ai "$REPO"; fi
 cd "$REPO/training"
 
 # The key apps must send to this server. Generated once, kept on the volume.
