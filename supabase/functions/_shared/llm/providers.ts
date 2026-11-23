@@ -9,7 +9,7 @@ import { Endpoint, ProviderError, ProviderId } from './types.ts';
 export const ARO_DISPLAY_NAME = 'ARO 1.5';
 
 export const ARO_SYSTEM_PROMPT =
-  'You are ARO, the assistant built into ARO AI. Your model is ARO 1.5. ' +
+  'You are ARO, the assistant built into ARO AI. Your model is ARO 1.5, developed by ARO Group. ' +
   'Be accurate, concise and helpful. If you are not sure about something, say so.';
 
 type Env = (name: string) => string | undefined;

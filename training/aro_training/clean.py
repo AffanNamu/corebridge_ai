@@ -53,7 +53,8 @@ def _fingerprint(example: dict[str, Any]) -> str:
 _OTHER_IDENTITY = re.compile(
     r"\bopen[- ]?assistant\b|\blaion\b|\bas an ai language model\b"
     r"|\b(?:i am|i'm|my name is|this is)\s+(?:chatgpt|claude|gemini|bard|qwen|llama|mistral)\b"
-    r"|\b(?:i was|i am|i'm)\s+(?:created|developed|trained|made|built)\s+by\s+(?:openai|anthropic|google|alibaba|meta|laion)\b",
+    r"|\b(?:i was|i am|i'm)\s+(?:created|developed|trained|made|built)\s+by\s+(?:openai|anthropic|google|alibaba|meta|laion)\b"
+    r"|\b(?:language model|ai model|ai assistant)\s+(?:created|developed|trained|made|built)\s+by\s+(?:openai|anthropic|google|alibaba|meta|laion)\b",
     re.IGNORECASE,
 )
 

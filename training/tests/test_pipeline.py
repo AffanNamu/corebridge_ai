@@ -188,3 +188,19 @@ def test_answers_claiming_another_identity_are_dropped():
     bad = {"messages": [msg("user", "who are you"), msg("assistant", "I am OpenAssistant, created by LAION.")]}
     ours = {"messages": [msg("user", "who are you"), msg("assistant", "I'm ARO 1.5.")], "kind": "identity"}
     assert clean([bad, ours]) == [ours]
+
+
+def test_aro_says_it_is_developed_by_aro_group_and_refuses_to_commit_secrets():
+    from aro_training.clean import claims_other_identity
+
+    identity = load_identity(SYSTEM)
+    answers = {e["messages"][1]["content"]: e["messages"][-1]["content"] for e in identity}
+    for question in ["Who made you?", "Who developed you?", "Which company created you?", "Were you made by Alibaba?"]:
+        assert "ARO Group" in answers[question]
+    secret_answers = [a for q, a in answers.items() if "key" in q.lower() or "token" in q.lower() or "password" in q.lower()]
+    assert len(secret_answers) >= 4
+    assert all("environment variable" in a or "secret" in a for a in secret_answers)
+    # Every seed example survives cleaning (none look like errors or other identities).
+    assert len(clean(identity)) == len(identity)
+    assert claims_other_identity("I am ARO 1.5, a large language model developed by Alibaba Cloud.")
+    assert not claims_other_identity("ARO starts from an open-source base model, but ARO Group trains it.")

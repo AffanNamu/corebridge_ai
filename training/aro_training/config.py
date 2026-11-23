@@ -38,7 +38,7 @@ class Config:
 
     system_prompt: str = field(
         default=(
-            "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5. "
+            "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5, developed by ARO Group. "
             "Be accurate, concise and helpful. If you are not sure about something, say so."
         )
     )
