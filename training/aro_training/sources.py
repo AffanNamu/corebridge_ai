@@ -152,8 +152,20 @@ def _load_gsm8k(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
 
 
 def _load_code_contests(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
-    # About half the problems have a short Python 3 solution.
-    return convert_code_contests(_hf("code-contests", _train_split("code-contests"), take=limit * 3), spec)[:limit]
+    """Streams CodeContests and converts row by row: each row carries large
+    test-case fields, so holding thousands of raw rows exhausts memory."""
+    from datasets import load_dataset
+
+    dataset = get("code-contests")
+    revision = dataset.version if re.fullmatch(r"[0-9a-f]{40}", dataset.version or "") else None
+    stream = load_dataset(dataset.hf_id, split=_train_split("code-contests"), revision=revision, streaming=True)
+    stream = stream.select_columns(["name", "description", "solutions"])
+    out: list[dict[str, Any]] = []
+    for row in stream:
+        out += convert_code_contests([row], spec)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _load_aya(spec: ModelSpec, limit: int) -> list[dict[str, Any]]:
