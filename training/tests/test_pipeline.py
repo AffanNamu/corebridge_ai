@@ -87,7 +87,8 @@ def test_prepare_first_run_uses_starter_and_later_runs_need_new_data():
 
     today, history = build_training_set([], [], starter, identity)
     assert len(history) == 5
-    assert len(today) == 5 + len(identity)
+    from aro_training.prepare import IDENTITY_REPEAT
+    assert len(today) == 5 + len(identity) * IDENTITY_REPEAT
 
     nothing, same_history = build_training_set([], history, [], identity)
     assert nothing == [] and same_history == history
@@ -170,3 +171,20 @@ def test_version_pointer_and_rollback():
     back = rollback_pointer(p)
     assert back["version"] == "v1"
     assert back["history"][-1]["note"] == "rollback from v2"
+
+
+def test_answers_claiming_another_identity_are_dropped():
+    from aro_training.clean import claims_other_identity
+    for text in [
+        "I am OpenAssistant, an open source AI model created by LAION-AI.",
+        "Hello! My name is Open Assistant and I'm a conversational AI.",
+        "As an AI language model, I don't have feelings.",
+        "I'm ChatGPT, how can I help?",
+        "I was trained by OpenAI.",
+    ]:
+        assert claims_other_identity(text), text
+    for text in ["ChatGPT is a model made by OpenAI.", "Paris is the capital of France.", "I'm ARO."]:
+        assert not claims_other_identity(text), text
+    bad = {"messages": [msg("user", "who are you"), msg("assistant", "I am OpenAssistant, created by LAION.")]}
+    ours = {"messages": [msg("user", "who are you"), msg("assistant", "I'm ARO 1.5.")], "kind": "identity"}
+    assert clean([bad, ours]) == [ours]

@@ -47,12 +47,29 @@ def _fingerprint(example: dict[str, Any]) -> str:
     return hashlib.sha256(norm.encode()).hexdigest()
 
 
+# Answers where the assistant presents itself as another product. Training on
+# them makes ARO forget who it is (seen in the first ARO 1.5 run: 158 of
+# 7,992 OpenAssistant replies said "I am OpenAssistant, created by LAION").
+_OTHER_IDENTITY = re.compile(
+    r"\bopen[- ]?assistant\b|\blaion\b|\bas an ai language model\b"
+    r"|\b(?:i am|i'm|my name is|this is)\s+(?:chatgpt|claude|gemini|bard|qwen|llama|mistral)\b"
+    r"|\b(?:i was|i am|i'm)\s+(?:created|developed|trained|made|built)\s+by\s+(?:openai|anthropic|google|alibaba|meta|laion)\b",
+    re.IGNORECASE,
+)
+
+
+def claims_other_identity(text: str) -> bool:
+    return bool(_OTHER_IDENTITY.search(text))
+
+
 def is_usable(example: dict[str, Any]) -> bool:
     messages = example.get("messages") or []
     if len(messages) < 2 or messages[-1].get("role") != "assistant":
         return False
     answer = str(messages[-1].get("content", "")).strip()
     if len(answer) < MIN_ANSWER_CHARS or any(marker in answer for marker in _ERROR_MARKERS):
+        return False
+    if example.get("kind") != "identity" and claims_other_identity(answer):
         return False
     return sum(len(str(m.get("content", ""))) for m in messages) <= MAX_EXAMPLE_CHARS
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ from .models import ModelSpec, spec, trainable_specs
 from .sources import identity_for, load_source
 
 EXIT_NOTHING_NEW = 2
+IDENTITY_REPEAT = 8
 
 
 def _read(path: Path) -> list[dict[str, Any]]:
@@ -52,9 +54,11 @@ def build_training_set(
     new = clean(user_examples + (starter if first_run else []))
     if not first_run and not new:
         return [], history  # nothing new to learn today
-    # Identity examples are always included: they're small and keep the model
-    # from drifting back to the base model's name.
-    today = clean(mix_with_replay(new, history, replay_ratio) + identity)
+    # Identity examples are always included, repeated so a few dozen lines
+    # still outweigh thousands of general examples: they keep the model from
+    # drifting back to another assistant's name.
+    today = clean(mix_with_replay(new, history, replay_ratio)) + clean(identity) * IDENTITY_REPEAT
+    random.Random(0).shuffle(today)
     updated_history = clean(history + new)
     return today, updated_history
 

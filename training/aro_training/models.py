@@ -29,6 +29,9 @@ class ModelSpec:
     thinking_default: bool
     # (dataset id, how many examples on a first run) — every id passes the license gate.
     starter_sources: tuple[tuple[str, int], ...]
+    # Passes over the training data. Translation needs more than one: a single
+    # pass left ARO Translate no better than the base model.
+    epochs: float = 1.0
 
     @property
     def eval_set(self) -> Path:
@@ -54,6 +57,9 @@ _STARTERS: dict[str, tuple[tuple[str, int], ...]] = {
 }
 
 
+_EPOCHS: dict[str, float] = {"aro-translate": 2.0}
+
+
 @lru_cache(maxsize=1)
 def _catalog() -> dict:
     return json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
@@ -73,6 +79,7 @@ def all_specs() -> dict[str, ModelSpec]:
             trainable=arch["strategy"] == "shared-foundation-lora",
             thinking_default=bool(arch.get("thinking_default")),
             starter_sources=_STARTERS.get(m["id"], ()),
+            epochs=_EPOCHS.get(m["id"], 1.0),
         )
     return specs
 

@@ -19,14 +19,22 @@ BASE=/workspace/aro
 REPO="$BASE/corebridge_ai"
 LOG="$BASE/run.log"
 PUBLIC="$BASE/public"
-MODELS=(aro-1.5 aro-code aro-research aro-translate)
+# ARO_MODELS="aro-1.5 aro-translate" retrains only those; ARO_REBUILD=1 rebuilds
+# their training data from scratch (after a data-pipeline fix).
+ALL_MODELS=(aro-1.5 aro-code aro-research aro-translate)
+read -r -a MODELS <<< "${ARO_MODELS:-${ALL_MODELS[*]}}"
 
 mkdir -p "$BASE" "$PUBLIC"
 export HF_HOME="$BASE/hf-cache" PIP_CACHE_DIR="$BASE/pip-cache" HF_HUB_ENABLE_HF_TRANSFER=0
 
 # Re-launch detached so the run survives closing the terminal.
 if [ -z "${ARO_DETACHED:-}" ]; then
+  # A previous run may still be serving on :8000 and holding the GPU.
+  [ -s "$BASE/run.pid" ] && kill "$(cat "$BASE/run.pid")" 2>/dev/null
+  pkill -f "vllm serve" 2>/dev/null; pkill -f "http.server 8000" 2>/dev/null
+  sleep 5
   ARO_DETACHED=1 nohup bash "$0" "$@" >> "$LOG" 2>&1 &
+  echo $! > "$BASE/run.pid"
   echo "ARO training started in the background (pid $!)."
   echo "Watch it:  tail -f $LOG"
   [ -n "${RUNPOD_POD_ID:-}" ] && echo "Status:    https://${RUNPOD_POD_ID}-8000.proxy.runpod.net/status.json"
@@ -74,8 +82,11 @@ venv() {  # venv <dir> <packages…>
 status installing "training libraries"
 venv "$BASE/train-venv" unsloth "trl>=0.12" "peft>=0.12" "transformers>=4.51" accelerate bitsandbytes datasets huggingface_hub -e .
 
-status preparing "building training data (license-gated)"
-"$BASE/train-venv/bin/python" -m aro_training.prepare --model all --no-users --data-dir "$BASE/data" || say "prepare reported nothing new"
+status preparing "building training data (license-gated): ${MODELS[*]}"
+for M in "${MODELS[@]}"; do
+  [ "${ARO_REBUILD:-}" = "1" ] && rm -rf "$BASE/data/$M"
+  "$BASE/train-venv/bin/python" -m aro_training.prepare --model "$M" --no-users --data-dir "$BASE/data" || say "[$M] nothing new to learn"
+done
 
 STAMP="run-$(date -u +%Y%m%d-%H%M)"
 TRAINED=()
@@ -98,7 +109,7 @@ export PATH="$BASE/serve-venv/bin:$PATH"
 
 serve() {  # serve [candidates]: starts vLLM on :8000 with the adapters in $BASE/live
   kill "$STATUS_SERVER" 2>/dev/null; wait "$STATUS_SERVER" 2>/dev/null
-  for M in "${MODELS[@]}"; do
+  for M in "${ALL_MODELS[@]}"; do
     VAR="ARO_ADAPTER_$(echo "$M" | tr 'a-z.-' 'A-Z__')"
     if [ -d "$BASE/live/$M" ]; then export "$VAR=$BASE/live/$M"; else unset "$VAR"; fi
   done

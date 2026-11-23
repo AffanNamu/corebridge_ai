@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -86,7 +87,8 @@ def train(
         "max_length": cfg.max_seq_length,
         "per_device_train_batch_size": cfg.batch_size,
         "gradient_accumulation_steps": cfg.grad_accum,
-        "num_train_epochs": cfg.epochs,
+        # Per-model default (models.py); ARO_EPOCHS overrides it for every model.
+        "num_train_epochs": cfg.epochs if os.environ.get("ARO_EPOCHS") else aro_model.epochs,
         "learning_rate": cfg.learning_rate,
         "lr_scheduler_type": "cosine",
         "warmup_ratio": 0.03,
@@ -125,6 +127,7 @@ def train(
         "train_loss": getattr(stats, "training_loss", None),
         "minutes": round((time.time() - started) / 60, 1),
         "lora_rank": cfg.lora_rank,
+        "epochs": cfg.epochs if os.environ.get("ARO_EPOCHS") else aro_model.epochs,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     (adapter_dir / "aro_manifest.json").write_text(json.dumps(manifest, indent=2))

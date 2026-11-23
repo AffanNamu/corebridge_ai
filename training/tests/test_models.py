@@ -176,3 +176,8 @@ def test_leaderboard_record_and_comparison_table(tmp_path, monkeypatch):
     text = compare.table(rows, "aro-code")
     assert "aro-code" in text and "+0.500" in text and "published" in text
     assert compare.table(rows, "aro-vision") == "No evaluations yet."
+
+
+def test_translate_trains_for_more_passes():
+    assert spec("aro-translate").epochs == 2.0
+    assert spec("aro-1.5").epochs == 1.0
