@@ -206,15 +206,16 @@ Deno.test('listModels ranks and filters a provider list', async () => {
     verify: verifyOk,
     fetchImpl,
   });
-  assertEquals((await res.json()).models, ['gpt-5.6', 'o4-mini']);
+  assertEquals((await res.json()).models, ['gpt-5.6']);
 });
 
 Deno.test('ranking helpers', () => {
   assertEquals(rankClaude(['claude-haiku-4', 'claude-opus-5', 'claude-sonnet-5', 'other']), [
-    'claude-sonnet-5',
     'claude-opus-5',
+    'claude-sonnet-5',
     'claude-haiku-4',
   ]);
+  assertEquals(rankOpenAI(['gpt-5.6-luna-mini', 'gpt-5.6-sol', 'o4-mini', 'gpt-4o-mini-tts']), ['gpt-5.6-sol', 'gpt-5.6-luna-mini']);
   assertEquals(rankGemini(['gemini-3-flash', 'text-embedding', 'gemini-3-pro', 'gemini-3-flash-lite']), [
     'gemini-3-pro',
     'gemini-3-flash',
@@ -223,6 +224,13 @@ Deno.test('ranking helpers', () => {
   assertEquals(rankQwen(['qwen-plus', 'qwen-vl-max', 'qwen3-max'], 'chat'), ['qwen3-max', 'qwen-plus']);
   assertEquals(rankQwen(['qwen-plus', 'qwen-vl-max', 'qwen-vl-plus'], 'vision'), ['qwen-vl-max', 'qwen-vl-plus']);
   assertEquals(rankOpenAI(['dall-e-3', 'gpt-5']), ['gpt-5']);
+});
+
+Deno.test('Qwen workspace keys (sk-ws-) use the workspace endpoint', () => {
+  const [ws] = resolveEndpoints('qwen', 'qwen3-max', 'sk-ws-abc', 'chat', envOf({}));
+  assertStringIncludes(ws.baseUrl, 'maas.aliyuncs.com');
+  const [pub] = resolveEndpoints('qwen', 'qwen3-max', 'sk-abc', 'chat', envOf({}));
+  assertEquals(pub.baseUrl, 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1');
 });
 
 Deno.test('agent purpose sends Gemini through its OpenAI-compatible API', () => {

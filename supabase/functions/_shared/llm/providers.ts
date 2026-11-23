@@ -23,6 +23,15 @@ const BYOK_BASE_URLS: Record<Exclude<ProviderId, 'aro'>, string> = {
   qwen: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
 };
 
+// Alibaba Model Studio workspace keys (sk-ws-…) live on a workspace endpoint,
+// not the public DashScope one. Matches the previously deployed ai-router.
+const QWEN_WORKSPACE_BASE_URL = 'https://ws-69hcvs1v8zn9hum7.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1';
+
+export function qwenBaseUrl(apiKey: string, env: Env = defaultEnv): string {
+  if (apiKey.startsWith('sk-ws-')) return (env('QWEN_WORKSPACE_BASE_URL') || QWEN_WORKSPACE_BASE_URL).replace(/\/+$/, '');
+  return BYOK_BASE_URLS.qwen;
+}
+
 /** Gemini's OpenAI-compatible surface, used for tool calling in aro-agent. */
 export const GEMINI_OPENAI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
@@ -68,7 +77,7 @@ export function resolveEndpoints(
   return [{
     provider,
     kind: provider === 'claude' ? 'anthropic' : 'openai',
-    baseUrl: BYOK_BASE_URLS[provider],
+    baseUrl: provider === 'qwen' ? qwenBaseUrl(key, env) : BYOK_BASE_URLS[provider],
     apiKey: key,
     model: model.trim(),
     servedBy: provider,
