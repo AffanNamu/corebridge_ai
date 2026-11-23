@@ -437,7 +437,7 @@
         "aro-code",
         "aro-research"
       ],
-      "notes": "Train split for ARO Code; test split kept for evaluation only.",
+      "notes": "Train split for ARO 1.5's coding capability; test split kept for evaluation only.",
       "splits": {
         "train": "train",
         "eval": "test"
@@ -554,7 +554,7 @@
         "aro-research",
         "aro-1.5"
       ],
-      "notes": "Train split for ARO Research; test split for evaluation only.",
+      "notes": "Train split for ARO 1.5's research capability; test split for evaluation only.",
       "splits": {
         "train": "train",
         "eval": "test"
@@ -1496,7 +1496,7 @@
       "models": [
         "aro-translate"
       ],
-      "notes": "Main ARO Translate training source for African languages."
+      "notes": "Main training source for ARO 1.5's translation capability for African languages."
     },
     {
       "id": "afriberta-corpus",

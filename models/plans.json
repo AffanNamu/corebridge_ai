@@ -1,5 +1,5 @@
 {
-  "_doc": "Default plans, limits and prices seeded into Supabase. PLACEHOLDER PRICES — set real ones in the admin dashboard (they live in the database after the first deploy). daily_limit: requests per day; null = no daily cap. Models missing from a plan aren't included in it (credits or a purchase can still unlock them). Media generation (ARO Creative) is credit-based.",
+  "_doc": "Default plans, limits and prices seeded into Supabase. PLACEHOLDER PRICES — set real ones in the admin dashboard (they live in the database after the first deploy). daily_limit: requests per day; null = no daily cap. Models missing from a plan aren't included in it (credits or a purchase can still unlock them). Media generation (the planned Creative capability) is credit-based.",
   "currency": "NGN",
   "plans": [
     {
@@ -71,7 +71,7 @@
     {
       "id": "aro-code-30d",
       "model_id": "aro-code",
-      "name": "ARO Code — 30 days",
+      "name": "ARO 1.5 · Code — 30 days",
       "price_minor": 400000,
       "duration_days": 30,
       "daily_limit": 200
@@ -79,7 +79,7 @@
     {
       "id": "aro-research-30d",
       "model_id": "aro-research",
-      "name": "ARO Research — 30 days",
+      "name": "ARO 1.5 · Research — 30 days",
       "price_minor": 400000,
       "duration_days": 30,
       "daily_limit": 100
@@ -87,7 +87,7 @@
     {
       "id": "aro-translate-30d",
       "model_id": "aro-translate",
-      "name": "ARO Translate — 30 days",
+      "name": "ARO 1.5 · Translate — 30 days",
       "price_minor": 250000,
       "duration_days": 30,
       "daily_limit": 300

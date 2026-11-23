@@ -135,15 +135,16 @@ export async function handleRequest(req: Request, deps: AgentDeps): Promise<Resp
   let aroNotice: string | undefined;
   try {
     if (body.provider === 'aro') {
-      // The agent runs on ARO Code; if the user's plan doesn't include it,
-      // ARO 1.5 does the work and the app says why. One request per run.
+      // The agent runs on ARO 1.5 with its coding capability; if the user's plan
+      // doesn't include that, ARO 1.5's general capability does the work and the
+      // app says why. One request per run.
       const routing = [{ role: 'user' as const, content: message || 'continue' }];
       try {
         aro = await resolveAro(db, user.uid, 'aro-code', routing, env);
       } catch (err) {
         if (!(err instanceof ProviderError) || ![402, 429, 503].includes(err.status) || !db) throw err;
         aro = await resolveAro(db, user.uid, 'aro-1.5', routing, env);
-        aroNotice = `${err.message} ARO 1.5 is working on this instead.`;
+        aroNotice = `${err.message} ARO 1.5 is working on this with its general capability instead.`;
       }
       endpoints = aro.endpoints;
     } else {

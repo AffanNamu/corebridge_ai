@@ -1,29 +1,31 @@
 # ARO AI
 
-An AI workspace with **seven ARO models** of its own and a **GitHub coding agent** that works directly in your repositories.
+An AI workspace built around **ARO**, one AI model family developed by **ARO Group**, plus a **GitHub coding agent** that works directly in your repositories.
 
-| ARO model | For |
+ARO is released in generations. **ARO 1.5** is the current one; ARO 2.0 and later are planned. Within a generation, coding, research and translation are **capabilities** of the same assistant:
+
+| ARO 1.5 capability | For |
 |---|---|
-| ARO 1.5 | General intelligence |
-| ARO Code | Software engineering; powers the Code tab agent |
-| ARO Research | Maths, science, advanced reasoning |
-| ARO Vision | Images and documents |
-| ARO Voice | Speech |
-| ARO Creative | Images, video, music |
-| ARO Translate | Multilingual, with a focus on African languages |
+| General | Conversation, writing, knowledge, reasoning |
+| Code | Software engineering; powers the Code tab agent |
+| Research | Maths, science, advanced reasoning |
+| Translate | Multilingual, with a focus on African languages |
+| Web search | Answers from live web results, with sources |
 
-- **Chat** with *ARO (Auto)*, which sends each request to the right ARO model, or pick a specific one. Users can still bring their own Claude, ChatGPT, Gemini or Qwen key.
+Vision, Voice and Creative are planned capabilities, not yet in any generation.
+
+- **Chat** with *ARO 1.5 (Auto)*, which picks the right capability for each request, or choose one. Users can still bring their own Claude, ChatGPT, Gemini or Qwen key.
 - **Code:** connect GitHub, pick a repository and describe a task. ARO reads the code, makes the change, pushes it and opens a pull request.
-- **Plans:** Free, Pro and Premium plans, individual model purchases and credits. They are enforced on the server and configured in the admin dashboard.
+- **Plans:** Free, Pro and Premium plans, individual capability purchases and credits. They are enforced on the server and configured in the admin dashboard.
 - **ARO keeps improving.** Users who opt in help train it with 👍/👎 and corrections. A new version goes live only if it beats the current one.
 
-See [docs/MODELS.md](docs/MODELS.md) for the model strategy, base models and licenses.
+See [docs/MODELS.md](docs/MODELS.md) for the generations, capabilities, base models and licenses.
 
 | Folder | What's inside |
 |---|---|
 | `apps/mobile` | Flutter app (Android): chat, Code tab, Models & Plan, admin dashboard, artifacts, files, settings |
 | `apps/web` | Next.js web app (early) |
-| `models` | The seven-model catalogue and default plans (source of truth) |
+| `models` | The ARO family catalogue (generations and capabilities) and default plans (source of truth) |
 | `supabase/functions` | Edge Functions: `ai-router` (chat and model router), `aro-agent` (GitHub agent), `aro-admin` (dashboard API), `file-process`, `export-artifact` |
 | `supabase/migrations` | Postgres: model catalogue, plans, entitlements, usage, credits, admin functions |
 | `firestore` | Security rules, indexes and their emulator tests |

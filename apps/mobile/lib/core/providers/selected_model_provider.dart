@@ -6,8 +6,10 @@ class AiModelOption {
   final bool supportsThinking;
   final bool supportsVision;
 
-  /// For provider 'aro': which ARO model ('auto' lets the server's router
-  /// pick the specialist). Null for the bring-your-own-key providers.
+  /// For provider 'aro': which ARO capability ('auto' lets the server's router
+  /// pick one). Null for the bring-your-own-key providers.
+  /// ARO is one model family by ARO Group (current generation: ARO 1.5);
+  /// Code, Research and Translate are capabilities of ARO 1.5, not separate models.
   final String? aroModel;
 
   const AiModelOption({
@@ -22,14 +24,15 @@ class AiModelOption {
 }
 
 final availableModels = const <AiModelOption>[
-  // ARO AI's own models. "ARO (Auto)" is first, so new users get the central
-  // router: it sends each request to the right ARO specialist.
-  AiModelOption(provider: 'aro', label: 'ARO (Auto)', aroModel: 'auto', supportsThinking: true, supportsVision: true),
+  // ARO, developed by ARO Group. "ARO 1.5 (Auto)" is first, so new users get
+  // the central router: it picks the right ARO 1.5 capability for each request.
+  AiModelOption(provider: 'aro', label: 'ARO 1.5 (Auto)', aroModel: 'auto', supportsThinking: true, supportsVision: true),
   AiModelOption(provider: 'aro', label: 'ARO 1.5', aroModel: 'aro-1.5', supportsThinking: true),
-  AiModelOption(provider: 'aro', label: 'ARO Code', aroModel: 'aro-code', supportsThinking: true),
-  AiModelOption(provider: 'aro', label: 'ARO Research', aroModel: 'aro-research', supportsThinking: true),
-  AiModelOption(provider: 'aro', label: 'ARO Translate', aroModel: 'aro-translate'),
-  AiModelOption(provider: 'aro', label: 'ARO Vision', aroModel: 'aro-vision', supportsVision: true),
+  AiModelOption(provider: 'aro', label: 'ARO 1.5 · Code', aroModel: 'aro-code', supportsThinking: true),
+  AiModelOption(provider: 'aro', label: 'ARO 1.5 · Research', aroModel: 'aro-research', supportsThinking: true),
+  AiModelOption(provider: 'aro', label: 'ARO 1.5 · Translate', aroModel: 'aro-translate'),
+  // Planned capability, not part of any released ARO generation yet; the server says so if picked.
+  AiModelOption(provider: 'aro', label: 'Vision (coming soon)', aroModel: 'aro-vision', supportsVision: true),
   AiModelOption(provider: 'claude', label: 'Claude', supportsThinking: true, supportsVision: true),
   AiModelOption(provider: 'openai', label: 'ChatGPT', supportsThinking: false, supportsVision: true),
   AiModelOption(provider: 'gemini', label: 'Gemini', supportsThinking: true, supportsVision: true),

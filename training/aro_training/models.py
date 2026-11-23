@@ -1,8 +1,9 @@
-"""Per-model training specs, read from models/catalog.json.
+"""Per-capability training specs, read from models/catalog.json.
 
-ARO 1.5, Code, Research and Translate are LoRA adapters on the shared
-foundation, so this pipeline trains them. Vision, Voice and Creative use
-specialist models with their own training stacks (see docs/MODELS.md).
+ARO is one model family by ARO Group. ARO 1.5's general, coding, research
+and translation capabilities are LoRA adapters on the shared foundation, so
+this pipeline trains them; each one identifies as ARO 1.5. Vision, Voice and
+Creative are planned capabilities with their own future stacks (docs/MODELS.md).
 """
 
 from __future__ import annotations
@@ -30,8 +31,11 @@ class ModelSpec:
     # (dataset id, how many examples on a first run) — every id passes the license gate.
     starter_sources: tuple[tuple[str, int], ...]
     # Passes over the training data. Translation needs more than one: a single
-    # pass left ARO Translate no better than the base model.
+    # pass left the translation capability no better than the base model.
     epochs: float = 1.0
+    # Which ARO generation this capability belongs to (None = planned, no generation yet).
+    generation: str | None = None
+    capability: str = ""
 
     @property
     def eval_set(self) -> Path:
@@ -80,6 +84,8 @@ def all_specs() -> dict[str, ModelSpec]:
             thinking_default=bool(arch.get("thinking_default")),
             starter_sources=_STARTERS.get(m["id"], ()),
             epochs=_EPOCHS.get(m["id"], 1.0),
+            generation=m.get("generation"),
+            capability=m.get("capability", ""),
         )
     return specs
 

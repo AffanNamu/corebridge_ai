@@ -56,13 +56,14 @@ Deno.test('auto routing picks the specialist by topic', () => {
   assertEquals(route('What is this?', true), 'aro-vision');
 });
 
-Deno.test({ name: 'Pro user: Auto sends a coding question to ARO Code with its own prompt', ...opts, fn: async () => {
+Deno.test({ name: "Pro user: Auto sends a coding question to ARO 1.5's coding capability, which still says it is ARO 1.5", ...opts, fn: async () => {
   const db = await testDb();
   await db.rpc('aro_admin_grant_plan', { p_admin: 'admin', p_user: USER, p_plan: 'pro', p_days: 30 });
   const server = aroServer();
   const out = await frames(await routerRequest(chat('Fix this bug in my JavaScript code'), { verify, db, env: ARO_ENV, fetchImpl: server.fetchImpl }));
   assertEquals(server.calls[0].model, 'aro-code');
-  assertStringIncludes(server.calls[0].system, 'ARO Code');
+  assertStringIncludes(server.calls[0].system, 'Your model is ARO 1.5, developed by ARO Group, with its coding capability active');
+  assert(!server.calls[0].system.includes('ARO Code'), 'capabilities are not separate products');
   assertEquals([out[0].meta.aroModel, out[0].meta.routed, out[0].meta.notice], ['aro-code', true, undefined]);
   assertEquals(out[1], { delta: 'answer from aro-code' });
 } });
@@ -73,8 +74,8 @@ Deno.test({ name: 'Free user: Auto never blocks — ARO 1.5 answers and the app 
   const out = await frames(await routerRequest(chat('Fix this bug in my JavaScript code'), { verify, db, env: ARO_ENV, fetchImpl: server.fetchImpl }));
   assertEquals(server.calls.map((c) => c.model), ['aro-1.5']);
   assertEquals(out[0].meta.aroModel, 'aro-1.5');
-  assertStringIncludes(out[0].meta.notice, "ARO Code isn't included in Free");
-  assertStringIncludes(out[0].meta.notice, 'ARO 1.5 answered instead');
+  assertStringIncludes(out[0].meta.notice, "ARO 1.5 · Code isn't included in Free");
+  assertStringIncludes(out[0].meta.notice, "ARO 1.5's general capability answered instead");
 } });
 
 Deno.test({ name: 'a specialist without a published adapter answers through ARO 1.5 on the same server', ...opts, fn: async () => {
@@ -82,7 +83,7 @@ Deno.test({ name: 'a specialist without a published adapter answers through ARO 
   const server = aroServer(['aro-1.5']); // only ARO 1.5 trained so far
   const out = await frames(await routerRequest(chat('Translate hello into Swahili', 'aro-translate'), { verify, db, env: ARO_ENV, fetchImpl: server.fetchImpl }));
   assertEquals(server.calls.map((c) => c.model), ['aro-translate', 'aro-1.5']);
-  assertStringIncludes(server.calls[1].system, 'ARO Translate'); // keeps the specialist's instructions
+  assertStringIncludes(server.calls[1].system, 'with its translation capability active'); // keeps the capability's instructions
   assertEquals([out[0].meta.aroModel, out[0].meta.model], ['aro-translate', 'aro-1.5']); // training credit goes to aro-1.5
 } });
 
@@ -110,12 +111,12 @@ Deno.test({ name: 'failed answers are refunded', ...opts, fn: async () => {
   assertEquals(usage[0].requests, 0);
 } });
 
-Deno.test({ name: 'images: Auto picks ARO Vision; text-only ARO models refuse them', ...opts, fn: async () => {
+Deno.test({ name: 'images: Auto picks the Vision capability; text-only capabilities refuse them', ...opts, fn: async () => {
   const db = await testDb();
   const image = { role: 'user', content: [{ type: 'text', text: 'What is this?' }, { type: 'image', mimeType: 'image/png', data: 'AAA' }] };
   const planned = await routerRequest(post({ provider: 'aro', model: 'auto', messages: [image] }), { verify, db, env: ARO_ENV });
   assertEquals(planned.status, 503);
-  assertStringIncludes((await planned.json()).error, "ARO Vision isn't available yet");
+  assertStringIncludes((await planned.json()).error, "ARO can't read images yet (Vision is a planned capability)");
 
   const wrong = await routerRequest(post({ provider: 'aro', model: 'aro-1.5', messages: [image] }), { verify, db, env: ARO_ENV });
   assertEquals(wrong.status, 400);

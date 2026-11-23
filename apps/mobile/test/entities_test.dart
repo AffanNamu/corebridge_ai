@@ -76,8 +76,10 @@ void main() {
     expect(back.commitCount, 2);
   });
 
-  test('picker offers ARO Auto first, the chat specialists, then BYOK providers', () {
-    expect(availableModels.first.label, 'ARO (Auto)');
+  test('picker offers ARO 1.5 (Auto) first, ARO 1.5 capabilities, then BYOK providers', () {
+    expect(availableModels.first.label, 'ARO 1.5 (Auto)');
+    // One model family: capabilities are labelled as ARO 1.5, never as separate products.
+    expect(availableModels.where((m) => m.isAro).map((m) => m.label).where((l) => RegExp(r'^ARO (Code|Research|Translate|Vision)').hasMatch(l)), isEmpty);
     expect(availableModels.first.aroModel, 'auto');
     final aro = availableModels.where((m) => m.isAro).map((m) => m.aroModel).toList();
     expect(aro, ['auto', 'aro-1.5', 'aro-code', 'aro-research', 'aro-translate', 'aro-vision']);

@@ -84,11 +84,15 @@ def test_convert_smol_makes_translation_requests_both_ways():
         assert ("Hello" in user) != ("Hello" in answer)
 
 
-def test_specialists_learn_their_own_name():
-    code_identity = sources.identity_for(spec("aro-code"))
-    answers = " ".join(e["messages"][-1]["content"] for e in code_identity)
-    assert "ARO Code" in answers and "ARO 1.5" not in answers
-    assert "ARO 1.5" in " ".join(e["messages"][-1]["content"] for e in sources.identity_for(spec("aro-1.5")))
+def test_every_capability_identifies_as_aro_1_5_not_a_separate_product():
+    for model_id in ["aro-1.5", "aro-code", "aro-research", "aro-translate"]:
+        examples = sources.identity_for(spec(model_id))
+        answers = " ".join(e["messages"][-1]["content"] for e in examples)
+        assert "ARO 1.5" in answers and "ARO Group" in answers, model_id
+        for product_name in ["ARO Code", "ARO Research", "ARO Translate", "ARO Vision"]:
+            assert product_name not in answers, (model_id, product_name)
+        assert examples[0]["messages"][0]["content"] == spec(model_id).system_prompt
+    assert spec("aro-code").name == "ARO 1.5 · Code" and spec("aro-code").generation == "aro-1.5"
 
 
 def test_feedback_goes_to_the_model_that_answered():

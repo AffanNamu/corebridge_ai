@@ -18,7 +18,7 @@ class SendMessageUseCase {
     required String userMessage,
     required List<MessageEntity> history,
     required String provider,
-    // For provider 'aro': which ARO model ('auto', 'aro-code', ...).
+    // For provider 'aro': which ARO capability ('auto', 'aro-code', ...).
     String? aroModel,
     List<ChatAttachment> attachments = const [],
     bool thinkingEnabled = false,
@@ -26,7 +26,7 @@ class SendMessageUseCase {
     CancelToken? cancelToken,
   }) async* {
     if (provider == 'aro' && attachments.isNotEmpty && aroModel != 'auto' && aroModel != 'aro-vision') {
-      throw StateError('This ARO model reads text only. Pick ARO Vision or ARO (Auto) to send images.');
+      throw StateError('ARO 1.5 reads text only. To send images, pick ARO 1.5 (Auto), or Claude, ChatGPT, Gemini or Qwen.');
     }
 
     final apiKeys = await _userSettingsRepository.getApiKeys(uid);

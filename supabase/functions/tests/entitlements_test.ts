@@ -4,7 +4,7 @@ import { testDb } from './pg.ts';
 
 const opts = { sanitizeResources: false, sanitizeOps: false };
 
-Deno.test({ name: 'seed: seven models and three plans from the catalogue', ...opts, fn: async () => {
+Deno.test({ name: 'seed: the seven capability entries and three plans from the catalogue', ...opts, fn: async () => {
   const db = await testDb();
   const models = await db.sql<{ id: string; status: string }>('select id, status from aro_models order by sort');
   assertEquals(models.map((m) => m.id), ['aro-1.5', 'aro-code', 'aro-research', 'aro-vision', 'aro-voice', 'aro-creative', 'aro-translate']);
@@ -36,12 +36,12 @@ Deno.test({ name: 'checking without consuming does not use up the allowance', ..
   assertEquals((await authorize(db, 'u1', 'aro-1.5')).used, 1);
 } });
 
-Deno.test({ name: 'free users need Pro (or a purchase, or credits) for ARO Code', ...opts, fn: async () => {
+Deno.test({ name: "free users need Pro (or a purchase, or credits) for ARO 1.5's coding capability", ...opts, fn: async () => {
   const db = await testDb();
   const denied = await authorize(db, 'u1', 'aro-code');
   assertEquals([denied.allowed, denied.reason], [false, 'upgrade_required']);
   assertEquals(denied.upgrade_plans, ['pro', 'premium']);
-  assertStringIncludes(denialMessage(denied, 'ARO Code'), "isn't included in Free. It's included in Pro and Premium.");
+  assertStringIncludes(denialMessage(denied, 'ARO 1.5 · Code'), "isn't included in Free. It's included in Pro and Premium.");
 
   await db.rpc('aro_admin_grant_plan', { p_admin: 'admin', p_user: 'u1', p_plan: 'pro', p_days: 30 });
   const ok = await authorize(db, 'u1', 'aro-code');

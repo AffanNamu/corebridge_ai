@@ -113,14 +113,13 @@ def convert_smol_pairs(pairs: Iterable[dict[str, Any]], spec: ModelSpec, seed: i
 
 
 def identity_for(spec: ModelSpec) -> list[dict[str, Any]]:
-    """The identity seed, rewritten so each specialist knows its own name."""
-    examples = load_identity(spec.system_prompt)
-    if spec.id == "aro-1.5":
-        return examples
-    for example in examples:
-        answer = example["messages"][-1]
-        answer["content"] = answer["content"].replace("ARO 1.5", spec.name)
-    return examples
+    """The identity seed with this capability's system prompt.
+
+    ARO is one model family: the coding, research and translation adapters
+    are capabilities of ARO 1.5, so they answer "I'm ARO 1.5, developed by
+    ARO Group" exactly like the general capability — never a separate name.
+    """
+    return load_identity(spec.system_prompt)
 
 
 def web_block(row: dict[str, Any]) -> str:

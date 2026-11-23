@@ -18,7 +18,7 @@
    │    │     ├─ aro-vision ─► vision server (Qwen3-VL)
    │    │     └─ backup model while the ARO server is offline
    │    └─ claude / openai / gemini / qwen ──► provider API with the user's key
-   ├─ aro-agent   GitHub coding agent (SSE) — runs on ARO Code (or ARO 1.5) or a BYOK model
+   ├─ aro-agent   GitHub coding agent (SSE) — runs on ARO 1.5 (coding capability) or a BYOK model
    ├─ aro-admin   admin dashboard API (ADMIN_UIDS only, every change audited)
    ├─ file-process    Storage → Cloudinary
    └─ export-artifact md / pdf / docx / zip
@@ -78,7 +78,7 @@ The default catalogue and plans come from `models/catalog.json` and `models/plan
 
 ## ARO models and the training loop
 
-The seven models, base models and licenses are in [MODELS.md](MODELS.md). The text models' training loop:
+ARO's generations, capabilities, base models and licenses are in [MODELS.md](MODELS.md). The ARO 1.5 capabilities' training loop:
 
 The full details are in [training/README.md](../training/README.md).
 

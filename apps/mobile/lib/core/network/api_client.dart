@@ -191,7 +191,7 @@ class AiRouterClient {
     }
   }
 
-  /// The server's own message (e.g. "ARO Code isn't included in Free…").
+  /// The server's own message (e.g. "ARO 1.5 · Code isn't included in Free…").
   static String _errorMessage(int status, String body) {
     try {
       final message = (jsonDecode(body) as Map<String, dynamic>)['error'];

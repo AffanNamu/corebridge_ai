@@ -29,8 +29,8 @@ Every control below is enforced on the server (Postgres + Edge Functions), never
 
 **Tiering.** With *ARO (Auto)*, the central router (`routeAroModel`) picks the model:
 - **ARO 1.5** answers by default.
-- **ARO Code, Research or Translate** answer only when the request clearly calls for them.
-- **ARO Vision** answers only when the message has an image.
+- **The coding, research or translation capability** is used only when the request clearly calls for it.
+- **Vision** (planned) would be used only when the message has an image.
 
 All four text models are LoRA adapters on one Qwen3-4B. A specialist costs the same GPU second as ARO 1.5; the credit prices only differ to reflect value. The paid backup API is used only when ARO's server fails before answering.
 
@@ -117,7 +117,7 @@ The trade-off is the **first reply after a quiet period**. It waits for a cold s
   - `ARO_SERVE_AFTER=1` restores serving from the pod.
 - A model with nothing new to learn is skipped. Before this change, a re-run retrained on yesterday's file.
 - **Spot (interruptible) pods** are much cheaper and now safe. Training saves a checkpoint every `ARO_SAVE_STEPS` (default 100). Running the script again resumes an interrupted model from its last checkpoint. Create the pod as interruptible on the network volume's data center (EU-RO-1).
-- A newly accepted model, for example the first ARO Code that beats ARO 1.5, must be added to the endpoint's `VLLM_EXTRA_ARGS` (`--lora-modules aro-code=/runpod-volume/aro/live/aro-code`). Until then the router answers with ARO 1.5.
+- A newly accepted model, for example the first coding adapter that beats ARO 1.5's general capability, must be added to the endpoint's `VLLM_EXTRA_ARGS` (`--lora-modules aro-code=/runpod-volume/aro/live/aro-code`). Until then the router answers with ARO 1.5.
 
 **Quantization (opt-in, gated).** FP8 weights roughly halve memory and speed up decoding on Ada and Hopper GPUs (4090, L4, H100). That allows more concurrent requests per worker, or a smaller GPU. Try it like this:
 

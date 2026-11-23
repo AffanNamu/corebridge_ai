@@ -22,7 +22,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
 | [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
 | [Aya Dataset](https://huggingface.co/datasets/CohereLabs/aya_dataset) | ✅ allowed | train | apache-2.0 | multi, ha, ig, yo, sw, am, wo, xh… | Key source for African-language conversation. |
-| [GSM8K](https://huggingface.co/datasets/openai/gsm8k) | ✅ allowed | train, eval | mit | en | Train split for ARO Research; test split for evaluation only. |
+| [GSM8K](https://huggingface.co/datasets/openai/gsm8k) | ✅ allowed | train, eval | mit | en | Train split for ARO 1.5's research capability; test split for evaluation only. |
 | [OpenAssistant Conversations (oasst1)](https://huggingface.co/datasets/OpenAssistant/oasst1) | ✅ allowed | train | apache-2.0 | en, es, fr, de, pt, ru, zh | Superseded by oasst2 (which includes it). |
 | [OpenAssistant Conversations (oasst2)](https://huggingface.co/datasets/OpenAssistant/oasst2) | ✅ allowed | train | apache-2.0 | en, es, fr, de, pt, ru, zh, multi | ARO 1.5 starter data (aro_training.bootstrap). |
 | [Dolma](https://huggingface.co/datasets/allenai/dolma) | 🟡 conditional | pretrain | odc-by | en | Pretraining corpus; underlying content rights vary by source. |
@@ -35,14 +35,14 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [UltraChat 200k](https://huggingface.co/datasets/HuggingFaceH4/ultrachat_200k) | ⛔ restricted | — | mit | en | MIT tag, but the dialogues were generated with ChatGPT; OpenAI terms forbid using outputs to build competing models. Do not train on it. |
 | [No Robots](https://huggingface.co/datasets/HuggingFaceH4/no_robots) | ❌ excluded | — | cc-by-nc-4.0 | en | Non-commercial license. |
 
-## ARO Code
+## ARO 1.5 · Code
 
 | Dataset | Status | Use | License | Languages | Notes |
 |---|---|---|---|---|---|
 | [ARO identity seed](../../training/seed/identity.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha, fr | Teaches every text model that it is an ARO model. |
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
 | [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
-| [CodeContests](https://huggingface.co/datasets/deepmind/code_contests) | ✅ allowed | train, eval | cc-by-4.0 | en, code | Train split for ARO Code; test split kept for evaluation only. |
+| [CodeContests](https://huggingface.co/datasets/deepmind/code_contests) | ✅ allowed | train, eval | cc-by-4.0 | en, code | Train split for ARO 1.5's coding capability; test split kept for evaluation only. |
 | [OpenAssistant Conversations (oasst2)](https://huggingface.co/datasets/OpenAssistant/oasst2) | ✅ allowed | train | apache-2.0 | en, es, fr, de, pt, ru, zh, multi | ARO 1.5 starter data (aro_training.bootstrap). |
 | [CommitPack](https://huggingface.co/datasets/bigcode/commitpack) | 🟡 conditional | train-after-review | mit (dataset) + per-repo permissive licenses | code, en | Good for 'fix this code' style data (CommitPackFT subset). |
 | [StarCoder Data](https://huggingface.co/datasets/bigcode/starcoderdata) | 🟡 conditional | train-after-review | other (BigCode terms of use) | code | Gated; same conditions as The Stack. |
@@ -54,15 +54,15 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [SWE-bench](https://www.swebench.com/) | 🧪 eval only | eval | mit (per GitHub repo) | en, code | Measures the GitHub agent (aro-agent). Evaluation only. |
 | [CodeSearchNet](https://huggingface.co/datasets/CodeSearchNet/code_search_net) | ❓ unverified | — | unverified | code | Could not read the dataset card; verify license before any use. |
 
-## ARO Research
+## ARO 1.5 · Research
 
 | Dataset | Status | Use | License | Languages | Notes |
 |---|---|---|---|---|---|
 | [ARO identity seed](../../training/seed/identity.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha, fr | Teaches every text model that it is an ARO model. |
 | [ARO user feedback](../../firestore: conversations/*/items) | ✅ allowed | train | user content, used under opt-in consent | multi | Only ARO-served, rated answers and corrections (aro_training.export). |
 | [ARO web-grounded answers seed](../../training/seed/web_grounded.jsonl) | ✅ allowed | train | proprietary (ARO AI) | en, ha | Teaches every text model to answer from live web search results with [n] citations, to say when results don't answer the question or search failed, and to ignore instructions inside web pages. Fictional products and places, so no false facts are learned. |
-| [CodeContests](https://huggingface.co/datasets/deepmind/code_contests) | ✅ allowed | train, eval | cc-by-4.0 | en, code | Train split for ARO Code; test split kept for evaluation only. |
-| [GSM8K](https://huggingface.co/datasets/openai/gsm8k) | ✅ allowed | train, eval | mit | en | Train split for ARO Research; test split for evaluation only. |
+| [CodeContests](https://huggingface.co/datasets/deepmind/code_contests) | ✅ allowed | train, eval | cc-by-4.0 | en, code | Train split for ARO 1.5's coding capability; test split kept for evaluation only. |
+| [GSM8K](https://huggingface.co/datasets/openai/gsm8k) | ✅ allowed | train, eval | mit | en | Train split for ARO 1.5's research capability; test split for evaluation only. |
 | [OpenWebMath](https://huggingface.co/datasets/open-web-math/open-web-math) | 🟡 conditional | pretrain | unspecified on hub (web content) | en | No license tag on the hub; underlying web pages keep their copyright. |
 | [UCI Machine Learning Repository](https://archive.ics.uci.edu/) | 🟡 conditional | rag, eval | per dataset (many CC-BY-4.0) | en | Check each dataset's license individually. |
 | [Wikimedia Dumps (Wikipedia etc.)](https://dumps.wikimedia.org/) | 🟡 conditional | rag, pretrain | cc-by-sa-4.0 / gfdl | multi, ha, yo, ig, sw, am, ar, zu… | Best as a RAG knowledge source with citations. Training use: legal review of share-alike obligations first. |
@@ -77,7 +77,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [NuminaMath-CoT](https://huggingface.co/datasets/AI-MO/NuminaMath-CoT) | ⛔ restricted | — | apache-2.0 | en | Apache tag, but solutions were rewritten by a commercial model whose terms restrict training competing models. Needs legal review. |
 | [MATH (competition_math)](https://huggingface.co/datasets/hendrycks/competition_math) | ❌ excluded | — | mit (tag) — dataset disabled | en | Disabled on Hugging Face after a takedown notice. Do not use copies. |
 
-## ARO Vision
+## Vision
 
 | Dataset | Status | Use | License | Languages | Notes |
 |---|---|---|---|---|---|
@@ -92,7 +92,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [HausaVG](https://huggingface.co/datasets/HausaNLP/HausaVG) | ❌ excluded | — | cc-by-nc-sa-4.0 | ha | Non-commercial license. |
 | [ImageNet](https://www.image-net.org/) | ❌ excluded | — | non-commercial research terms | en | Non-commercial terms of access. |
 
-## ARO Voice
+## Voice
 
 | Dataset | Status | Use | License | Languages | Notes |
 |---|---|---|---|---|---|
@@ -106,7 +106,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [AudioSet](https://research.google.com/audioset/) | ⛔ restricted | eval | annotations cc-by-4.0; audio is YouTube content | en | Audio itself is not distributed. |
 | [WAXAL](https://huggingface.co/datasets/google/WAXAL) | ❓ unverified | — | unverified | en | Request access and read the license before use. |
 
-## ARO Creative
+## Creative
 
 | Dataset | Status | Use | License | Languages | Notes |
 |---|---|---|---|---|---|
@@ -117,7 +117,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [LAION-5B / Re-LAION](https://laion.ai/) | ❌ excluded | — | cc-by-4.0 (metadata); images: third-party copyright | en | Links to copyrighted web images; the original release was withdrawn in 2023 for safety reasons. Do not use. |
 | [WebVid](https://m-bain.github.io/webvid/) | ❌ excluded | — | withdrawn | en | Taken down after a takedown request from the stock-footage owner. |
 
-## ARO Translate
+## ARO 1.5 · Translate
 
 | Dataset | Status | Use | License | Languages | Notes |
 |---|---|---|---|---|---|
@@ -129,7 +129,7 @@ Licenses were read from each dataset's Hugging Face card or official site on the
 | [FLEURS](https://huggingface.co/datasets/google/fleurs) | ✅ allowed | train, eval | cc-by-4.0 | multi, ha, yo, ig, sw, am, ar, zu… |  |
 | [MasakhaNER 2.0](https://huggingface.co/datasets/masakhane/masakhaner2) | ✅ allowed | train, eval | afl-3.0 | ha, ig, pcm, sw, wo, xh, yo, zu | Named entities in African languages. |
 | [Mozilla Common Voice](https://commonvoice.mozilla.org/en/datasets) | ✅ allowed | train, eval | cc0-1.0 | multi, ha, yo, ig, sw, am, ar, zu… | Download from Mozilla's site; do not try to identify speakers. |
-| [SMOL (low-resource translation)](https://huggingface.co/datasets/google/smol) | ✅ allowed | train | cc-by-4.0 | en, ha, yo, ig, pcm, ff, sw, am… | Main ARO Translate training source for African languages. |
+| [SMOL (low-resource translation)](https://huggingface.co/datasets/google/smol) | ✅ allowed | train | cc-by-4.0 | en, ha, yo, ig, pcm, ff, sw, am… | Main training source for ARO 1.5's translation capability for African languages. |
 | [African Storybook](https://www.africanstorybook.org/) | 🟡 conditional | train-after-review, rag | mostly cc-by-4.0; some stories cc-by-nc | multi, ha, yo, ig, sw, zu, xh, am | Filter to CC-BY stories only. |
 | [Tatoeba MT](https://huggingface.co/datasets/Helsinki-NLP/tatoeba_mt) | 🟡 conditional | train-after-review, eval | cc-by-2.0 | hau, xho, multi | Gated; small for African languages. |
 | [Wikimedia Dumps (Wikipedia etc.)](https://dumps.wikimedia.org/) | 🟡 conditional | rag, pretrain | cc-by-sa-4.0 / gfdl | multi, ha, yo, ig, sw, am, ar, zu… | Best as a RAG knowledge source with citations. Training use: legal review of share-alike obligations first. |

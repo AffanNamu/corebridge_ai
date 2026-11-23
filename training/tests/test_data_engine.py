@@ -139,6 +139,6 @@ def test_manifest_records_provenance_and_detects_changes(tmp_path):
 
 def test_dataset_card_is_generated_for_every_model():
     text = cards.render()
-    for name in ["ARO 1.5", "ARO Code", "ARO Research", "ARO Vision", "ARO Voice", "ARO Creative", "ARO Translate"]:
+    for name in ["ARO 1.5", "ARO 1.5 · Code", "ARO 1.5 · Research", "Vision", "Voice", "Creative", "ARO 1.5 · Translate"]:
         assert f"## {name}" in text
     assert "❌ excluded" in text and "✅ allowed" in text

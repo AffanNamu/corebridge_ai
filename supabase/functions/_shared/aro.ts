@@ -1,10 +1,10 @@
-// The central ARO model router: picks the right ARO model for a request,
+// The central ARO router: picks the right ARO capability for a request,
 // checks the user's entitlement in Postgres, and resolves where to send it.
 //
-// Text models (ARO 1.5, Code, Research, Translate) are LoRA adapters on one
-// vLLM server (ARO_MODEL_BASE_URL). ARO Vision runs on its own server
-// (ARO_VISION_BASE_URL). A specialist whose adapter isn't published yet
-// answers through ARO 1.5 on the same server.
+// ARO 1.5's capabilities (general, code, research, translate) are LoRA
+// adapters on one vLLM server (ARO_MODEL_BASE_URL). The planned Vision
+// capability would run on its own server (ARO_VISION_BASE_URL). A capability
+// whose adapter isn't published yet answers through ARO 1.5's general weights.
 
 import type { Db } from './db.ts';
 import { type Authorization, authorize, denialMessage, refund } from './entitlements.ts';
@@ -14,14 +14,22 @@ import { type ChatMessage, type Endpoint, ProviderError, textOf } from './llm/ty
 export const ARO_MODEL_IDS = ['aro-1.5', 'aro-code', 'aro-research', 'aro-vision', 'aro-voice', 'aro-creative', 'aro-translate'] as const;
 export type AroModelId = typeof ARO_MODEL_IDS[number];
 
+// ARO is one model family by ARO Group, released in generations (ARO 1.5, ARO 2.0, …).
+// The ids are stable keys for capabilities, not separate products: aro-1.5 is
+// the current generation's general capability; aro-code, aro-research and
+// aro-translate are ARO 1.5's coding, research and translation capabilities;
+// aro-vision, aro-voice and aro-creative are planned capabilities that no
+// released generation has yet. Display names match models/catalog.json.
+export const CURRENT_GENERATION = 'ARO 1.5';
+
 const NAMES: Record<AroModelId, string> = {
   'aro-1.5': 'ARO 1.5',
-  'aro-code': 'ARO Code',
-  'aro-research': 'ARO Research',
-  'aro-vision': 'ARO Vision',
-  'aro-voice': 'ARO Voice',
-  'aro-creative': 'ARO Creative',
-  'aro-translate': 'ARO Translate',
+  'aro-code': 'ARO 1.5 · Code',
+  'aro-research': 'ARO 1.5 · Research',
+  'aro-vision': 'Vision',
+  'aro-voice': 'Voice',
+  'aro-creative': 'Creative',
+  'aro-translate': 'ARO 1.5 · Translate',
 };
 
 export function aroName(id: string): string {
@@ -133,10 +141,10 @@ export async function resolveAro(
   if (!isAroModelId(route.model)) throw new ProviderError(`Unknown ARO model: ${requested}`, 400, false);
 
   if (images && route.model !== 'aro-vision') {
-    throw new ProviderError(`${aroName(route.model)} can't read images. Pick ARO Vision (or Auto) to send images.`, 400, false);
+    throw new ProviderError(`${aroName(route.model)} reads text only. Pick Auto to send images, or another model that can read them.`, 400, false);
   }
   if (route.model === 'aro-voice' || route.model === 'aro-creative') {
-    throw new ProviderError(`${aroName(route.model)} isn't a chat model — it's used from its own screen.`, 400, false);
+    throw new ProviderError(`${aroName(route.model)} isn't a chat capability — it's used from its own screen.`, 400, false);
   }
 
   let aroModel: AroModelId = route.model;
@@ -146,14 +154,14 @@ export async function resolveAro(
   // Auto never blocks the user: if the specialist isn't available to them,
   // ARO 1.5 answers and the app explains why.
   if (!auth.allowed && auto && aroModel !== 'aro-1.5' && !images) {
-    notice = `${denialMessage(auth, aroName(aroModel))} ARO 1.5 answered instead.`;
+    notice = `${denialMessage(auth, aroName(aroModel))} ARO 1.5's general capability answered instead.`;
     aroModel = 'aro-1.5';
     auth = await authorize(db, userId, aroModel);
   }
   if (!auth.allowed) {
     if (images && auth.reason === 'model_unavailable') {
       throw new ProviderError(
-        "ARO Vision isn't available yet. To ask about an image, pick Claude, ChatGPT, Gemini or Qwen.",
+        "ARO can't read images yet (Vision is a planned capability). To ask about an image, pick Claude, ChatGPT, Gemini or Qwen.",
         503,
         false,
       );

@@ -1,17 +1,125 @@
 {
-  "_doc": "The seven ARO models — the complete product catalogue. Source of truth for training (training/aro_training/models.py), the Supabase seed (supabase/migrations) and docs/MODELS.md. Statuses here are defaults; admins change live status/limits in the admin dashboard. Auto-routing rules (which specialist answers a request) live in supabase/functions/_shared/aro.ts.",
+  "_doc": "ARO is ONE model family developed by ARO Group, released in generations (ARO 1.5, ARO 2.0, …). `generations` describes each generation: its identity, intelligence level, configuration, capabilities and roadmap. `models` are the capability entries the product exposes (ids are stable keys used by plans, purchases, usage, served adapter names and the app; they are not separate products): `aro-1.5` is the generation's general capability, `aro-code` / `aro-research` / `aro-translate` are ARO 1.5's coding, research and translation capabilities, and `aro-vision` / `aro-voice` / `aro-creative` are planned capabilities not yet available in any generation. Source of truth for training (training/aro_training/models.py), the Supabase seed and docs/MODELS.md. Statuses are defaults; admins change live status/limits in the admin dashboard. Auto-routing rules live in supabase/functions/_shared/aro.ts.",
+  "family": {
+    "name": "ARO",
+    "developer": "ARO Group",
+    "current_generation": "aro-1.5",
+    "identity_rule": "Every capability introduces itself as the generation it runs on (e.g. 'ARO 1.5, developed by ARO Group'), never as a separate product."
+  },
+  "generations": [
+    {
+      "id": "aro-1.5",
+      "name": "ARO 1.5",
+      "status": "current",
+      "description": "The first generation of the ARO family: a compact text model adapted by ARO Group and served on ARO's own GPUs, with capability adapters for coding, research and translation.",
+      "intelligence_level": "Compact (about 4B parameters). Good for everyday questions, writing help, coding help and step-by-step maths; not a frontier-scale model. Can answer from live web search results with citations.",
+      "configuration": {
+        "foundation": "Qwen/Qwen3-4B (apache-2.0)",
+        "method": "LoRA capability adapters on one shared foundation, served by one vLLM server",
+        "context_tokens": 32768,
+        "modalities": {
+          "input": [
+            "text"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "serving": "RunPod Serverless, scales to zero (training/serverless/aro-models.endpoint.json)"
+      },
+      "capabilities": {
+        "general": {
+          "model_id": "aro-1.5",
+          "status": "available"
+        },
+        "code": {
+          "model_id": "aro-code",
+          "status": "preview",
+          "note": "Coding instructions on the general weights until a trained adapter passes the quality gate."
+        },
+        "research": {
+          "model_id": "aro-research",
+          "status": "preview",
+          "note": "Trained adapter in use: it beat the general capability on the research test set."
+        },
+        "translate": {
+          "model_id": "aro-translate",
+          "status": "preview",
+          "note": "Translation instructions on the general weights; trained adapters have not yet beaten the base model."
+        },
+        "web_search": {
+          "status": "available",
+          "note": "Answers from live web results with [n] citations (server-side search; not a trained skill yet)."
+        },
+        "coding_agent": {
+          "status": "available",
+          "note": "Works in GitHub repositories through tool calling."
+        },
+        "thinking": {
+          "status": "available"
+        }
+      },
+      "not_included": [
+        "image understanding (Vision)",
+        "speech (Voice)",
+        "media generation (Creative)"
+      ],
+      "distinction_from_previous": "First ARO generation."
+    },
+    {
+      "id": "aro-2.0",
+      "name": "ARO 2.0",
+      "status": "planned",
+      "description": "Next generation. Not available and not yet trained; the goals below are targets, not capabilities.",
+      "intelligence_level": "Target: clearly stronger than ARO 1.5 on every capability's test set.",
+      "configuration": {
+        "foundation": "to be decided (candidate: a larger apache-2.0 model, e.g. the 8B class)",
+        "context_tokens": "to be decided"
+      },
+      "roadmap": [
+        "Choose and license-check a larger foundation; benchmark it against ARO 1.5",
+        "Train coding, research and translation adapters that pass the quality gate",
+        "Evaluate adding image understanding (Vision) to the generation",
+        "Train on consenting users' ARO 1.5 feedback"
+      ],
+      "release_criteria": "Beats ARO 1.5 on every capability's test set with no critical (identity/safety) regressions.",
+      "distinction_from_previous": "To be defined by measured results against ARO 1.5."
+    },
+    {
+      "id": "aro-3.0",
+      "name": "ARO 3.0",
+      "status": "planned",
+      "description": "Future generation. Not available; scope will be set after ARO 2.0 ships.",
+      "roadmap": [
+        "Candidate goals: speech (Voice), deeper African-language ability, tool use as a trained skill"
+      ],
+      "release_criteria": "Beats ARO 2.0 on every capability's test set with no critical regressions."
+    },
+    {
+      "id": "aro-4.0",
+      "name": "ARO 4.0",
+      "status": "planned",
+      "description": "Future generation. Not available; exploratory.",
+      "roadmap": [
+        "Candidate goals: media generation (Creative) and broader multimodal ability"
+      ],
+      "release_criteria": "Beats ARO 3.0 on every capability's test set with no critical regressions."
+    }
+  ],
   "shared_foundation": {
     "base_model": "Qwen/Qwen3-4B",
     "license": "apache-2.0",
     "license_checked": "2026-11-22 (Hugging Face API license tag)",
     "upgrade_path": "Qwen/Qwen3-8B (apache-2.0) once a 24 GB+ GPU serves production",
-    "why": "One base model serves ARO 1.5, Code, Research and Translate as LoRA adapters on a single vLLM server: one GPU, four specialists."
+    "why": "One base model serves ARO 1.5's general, coding, research and translation capabilities as LoRA adapters on a single vLLM server: one GPU, one model family."
   },
   "models": [
     {
       "id": "aro-1.5",
       "name": "ARO 1.5",
-      "tagline": "General intelligence",
+      "tagline": "General",
+      "generation": "aro-1.5",
+      "capability": "general",
       "default_status": "live",
       "chat_selectable": true,
       "modalities": {
@@ -44,8 +152,10 @@
     },
     {
       "id": "aro-code",
-      "name": "ARO Code",
-      "tagline": "Software engineering intelligence",
+      "name": "ARO 1.5 · Code",
+      "tagline": "ARO 1.5's coding capability",
+      "generation": "aro-1.5",
+      "capability": "code",
       "default_status": "preview",
       "chat_selectable": true,
       "modalities": {
@@ -82,12 +192,14 @@
           }
         ]
       },
-      "system_prompt": "You are ARO Code, ARO AI's software engineering model, developed by ARO Group. Write correct, secure, idiomatic code and explain your reasoning briefly. Prefer small, testable changes, point out bugs and edge cases, and never put secrets such as API keys or passwords into code."
+      "system_prompt": "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5, developed by ARO Group, with its coding capability active. Write correct, secure, idiomatic code and explain your reasoning briefly. Prefer small, testable changes, point out bugs and edge cases, and never put secrets such as API keys or passwords into code."
     },
     {
       "id": "aro-research",
-      "name": "ARO Research",
-      "tagline": "Scientific & advanced reasoning",
+      "name": "ARO 1.5 · Research",
+      "tagline": "ARO 1.5's research & reasoning capability",
+      "generation": "aro-1.5",
+      "capability": "research",
       "default_status": "preview",
       "chat_selectable": true,
       "modalities": {
@@ -117,12 +229,14 @@
         "endpoint": "text",
         "thinking_default": true
       },
-      "system_prompt": "You are ARO Research, ARO AI's model for science, mathematics and advanced reasoning, developed by ARO Group. Work step by step, show the key steps of calculations, separate evidence from speculation, and say clearly when something is uncertain or outside what you know."
+      "system_prompt": "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5, developed by ARO Group, with its research and reasoning capability active. Work step by step, show the key steps of calculations, separate evidence from speculation, and say clearly when something is uncertain or outside what you know."
     },
     {
       "id": "aro-vision",
-      "name": "ARO Vision",
-      "tagline": "Visual intelligence",
+      "name": "Vision",
+      "tagline": "Image understanding — planned capability",
+      "generation": null,
+      "capability": "vision",
       "default_status": "planned",
       "chat_selectable": true,
       "modalities": {
@@ -153,12 +267,14 @@
         "endpoint": "vision",
         "upgrade_path": "Qwen/Qwen3-VL-8B-Instruct (apache-2.0)"
       },
-      "system_prompt": "You are ARO Vision, ARO AI's visual intelligence model, developed by ARO Group. Describe and analyse images, documents and screenshots accurately. Only state what you can actually see, and say when something is unclear."
+      "system_prompt": "You are ARO, the assistant built into ARO AI, developed by ARO Group, with your image-understanding capability active. Describe and analyse images, documents and screenshots accurately. Only state what you can actually see, and say when something is unclear."
     },
     {
       "id": "aro-voice",
-      "name": "ARO Voice",
-      "tagline": "Speech & audio intelligence",
+      "name": "Voice",
+      "tagline": "Speech — planned capability",
+      "generation": null,
+      "capability": "voice",
       "default_status": "planned",
       "chat_selectable": false,
       "modalities": {
@@ -180,7 +296,7 @@
         "speaker-independent understanding",
         "audio classification",
         "voice commands",
-        "spoken-language translation (with ARO Translate)",
+        "spoken-language translation (with the translation capability)",
         "multilingual speech"
       ],
       "architecture": {
@@ -205,8 +321,10 @@
     },
     {
       "id": "aro-creative",
-      "name": "ARO Creative",
-      "tagline": "Generative media",
+      "name": "Creative",
+      "tagline": "Media generation — planned capability",
+      "generation": null,
+      "capability": "creative",
       "default_status": "planned",
       "chat_selectable": false,
       "billing": "credits",
@@ -227,7 +345,7 @@
         "image editing & image-to-image",
         "text-to-video & image-to-video",
         "music & audio generation",
-        "creative writing, lyrics & storytelling (via ARO 1.5)",
+        "creative writing, lyrics & storytelling (ARO 1.5 general capability)",
         "multimedia content creation"
       ],
       "architecture": {
@@ -258,8 +376,10 @@
     },
     {
       "id": "aro-translate",
-      "name": "ARO Translate",
-      "tagline": "Multilingual & African language intelligence",
+      "name": "ARO 1.5 · Translate",
+      "tagline": "ARO 1.5's translation capability",
+      "generation": "aro-1.5",
+      "capability": "translate",
       "default_status": "preview",
       "chat_selectable": true,
       "modalities": {
@@ -290,7 +410,7 @@
         "language identification",
         "contextual translation",
         "African language understanding",
-        "speech translation (with ARO Voice)",
+        "speech translation (with the Voice capability)",
         "grammar correction",
         "multilingual summarization",
         "language learning"
@@ -306,7 +426,7 @@
           "license_checked": "2026-11-22 (Hugging Face API license tag)"
         }
       },
-      "system_prompt": "You are ARO Translate, ARO AI's multilingual model developed by ARO Group, with special care for African languages such as Hausa, Yoruba, Igbo, Nigerian Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu and Xhosa. Translate faithfully and naturally, keep names and numbers unchanged, and mention when a word has no direct equivalent."
+      "system_prompt": "You are ARO, the assistant built into ARO AI. Your model is ARO 1.5, developed by ARO Group, with its translation capability active, with special care for African languages such as Hausa, Yoruba, Igbo, Nigerian Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu and Xhosa. Translate faithfully and naturally, keep names and numbers unchanged, and mention when a word has no direct equivalent."
     }
   ],
   "rejected_options": [

@@ -1,6 +1,6 @@
 # ARO training pipeline and Data Engine
 
-This folder builds ARO AI's own **text models** — ARO 1.5, ARO Code, ARO Research and ARO Translate — and improves them every day from user feedback. All four share one base model (`Qwen/Qwen3-4B`, Apache-2.0); each is a small LoRA adapter. Vision, Voice and Creative use specialist models (see [docs/MODELS.md](../docs/MODELS.md)).
+This folder builds **ARO 1.5** (ARO Group's current generation) and its **capabilities** — general, coding, research and translation — and improves them every day from user feedback. All four share one base model (`Qwen/Qwen3-4B`, Apache-2.0); each is a small LoRA adapter. Vision, Voice and Creative use specialist models (see [docs/MODELS.md](../docs/MODELS.md)).
 
 ```
 Data Engine (registry + license gate)      users' 👍 / 👎 + corrections (opt-in only)
@@ -26,9 +26,9 @@ prepare (per model) ──► train ──► evaluate ──► publish ──�
 | Model | Starter data (all ✅ cleared by the license gate) |
 |---|---|
 | ARO 1.5 | OpenAssistant oasst2 (Apache-2.0), Aya (Apache-2.0), GSM8K (MIT) |
-| ARO Code | CodeContests (CC-BY-4.0, Python 3 solutions), oasst2 |
-| ARO Research | GSM8K (step-by-step), CodeContests |
-| ARO Translate | Google SMOL (CC-BY-4.0: Hausa, Yoruba, Igbo, Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu, Xhosa), Aya |
+| ARO 1.5 · Code | CodeContests (CC-BY-4.0, Python 3 solutions), oasst2 |
+| ARO 1.5 · Research | GSM8K (step-by-step), CodeContests |
+| ARO 1.5 · Translate | Google SMOL (CC-BY-4.0: Hausa, Yoruba, Igbo, Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu, Xhosa), Aya |
 
 ```bash
 python -m aro_data validate            # registry complete and consistent

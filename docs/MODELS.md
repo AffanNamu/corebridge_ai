@@ -1,37 +1,62 @@
-# The seven ARO models
+# ARO: one model family, released in generations
 
-ARO AI's product catalogue is exactly seven models. New features become **capabilities inside these models**, not new models. The machine-readable source of truth is [`models/catalog.json`](../models/catalog.json); plans and prices start from [`models/plans.json`](../models/plans.json) and are then edited in the admin dashboard.
+**ARO is one AI model family, developed by ARO Group.** It is released in **generations**: ARO 1.5 today, then ARO 2.0, 3.0, 4.0 and so on. Each generation has its own version identity, intelligence level, configuration and roadmap, and it must be measurably better than the one before it.
 
-| Model | What it covers | How it's built | Status today |
-|---|---|---|---|
-| **ARO 1.5** | General intelligence: conversation, writing, knowledge, reasoning, planning, tool use | LoRA adapter on the shared foundation | Live once the model server runs |
-| **ARO Code** | Code generation, debugging, review, architecture, tests, repo understanding (powers the Code tab agent) | LoRA adapter on the shared foundation | Preview (answers through ARO 1.5 until its adapter is published) |
-| **ARO Research** | Maths, science, advanced reasoning, research and academic writing | LoRA adapter on the shared foundation; thinking on by default | Preview |
-| **ARO Translate** | Translation and African-language intelligence | LoRA adapter on the shared foundation | Preview |
-| **ARO Vision** | Image and document understanding, OCR, visual Q&A | Specialist vision-language model on its own server | Planned (server and routing are built; needs a GPU server) |
-| **ARO Voice** | Speech-to-text, text-to-speech, voice conversations | Specialist speech models | Planned (catalogue, plans and credits only) |
-| **ARO Creative** | Image, video and music generation; creative writing | Specialist generation models, credit-billed | Planned (catalogue, plans and credits only) |
+Coding, research, translation and the planned vision, voice and media abilities are **capabilities of the ARO assistant**, not separate AI products. Whatever capability is active, ARO introduces itself as the generation it runs on, for example "ARO 1.5, developed by ARO Group".
 
-An admin can change any model's status in the dashboard. `planned` and `disabled` models are refused by the server for everyone.
+The machine-readable source of truth is [`models/catalog.json`](../models/catalog.json):
+- `family`: the name, developer and current generation
+- `generations`: each generation's description, intelligence level, configuration, capabilities and roadmap
+- `models`: the capability entries the product exposes
 
-## Shared foundation, specialist adapters
+Plans and prices start from [`models/plans.json`](../models/plans.json) and are then edited in the admin dashboard.
 
-ARO 1.5, Code, Research and Translate are **one base model with four small LoRA adapters**. vLLM loads the base once and serves each adapter under its own name (`aro-1.5`, `aro-code`, …). One GPU serves four specialists, and each specialist trains and versions independently.
+## Generations
+
+| Generation | Status | What it is |
+|---|---|---|
+| **ARO 1.5** | **Current** | Compact text model (about 4B parameters, `Qwen/Qwen3-4B` foundation, Apache-2.0) adapted by ARO Group with LoRA capability adapters. 32k-token context. Good for everyday questions, writing, coding help and step-by-step maths; not a frontier-scale model. |
+| **ARO 2.0** | Planned, not available | Next generation. Goals: a larger, license-checked foundation; capability adapters that pass the quality gate; evaluating image understanding. Must beat ARO 1.5 on every capability's test set. |
+| **ARO 3.0** | Planned, not available | Scope set after ARO 2.0 ships. Candidate goals: speech, deeper African-language ability, tool use as a trained skill. |
+| **ARO 4.0** | Planned, not available | Exploratory. Candidate goals: media generation and broader multimodal ability. |
+
+The goals for 2.0, 3.0 and 4.0 are targets, not capabilities. Nothing here should be presented to users as available until that generation passes its release criteria.
+
+## ARO 1.5 capabilities
+
+| Capability | Id (stable key) | Status in ARO 1.5 |
+|---|---|---|
+| General: conversation, writing, knowledge, reasoning, planning, tool use | `aro-1.5` | Available |
+| Coding: generation, debugging, review; powers the Code tab agent | `aro-code` | Preview: coding instructions on the general weights until a trained adapter passes the quality gate |
+| Research: maths, science, advanced reasoning (thinking on by default) | `aro-research` | Preview: trained adapter in use; it beat the general capability on the research test set |
+| Translation: with a focus on African languages | `aro-translate` | Preview: translation instructions on the general weights; trained adapters haven't beaten the base model yet |
+| Web search: answers from live results with citations | — | Available (server-side search) |
+| Coding agent in GitHub repositories | — | Available (tool calling) |
+
+**Planned capabilities, not part of any released generation:** Vision (`aro-vision`, image understanding), Voice (`aro-voice`, speech) and Creative (`aro-creative`, media generation). The server refuses them for everyone until they're built and switched on, and the app labels Vision "coming soon".
+
+**Why the ids stay `aro-code` and so on:** plans, purchases, usage records, served adapter names and the app all use them as keys. They are capability keys, not product names. Users see "ARO 1.5 · Code", "ARO 1.5 · Research" and "ARO 1.5 · Translate".
+
+An admin can change any capability's status in the dashboard. `planned` and `disabled` capabilities are refused by the server for everyone.
+
+## How ARO 1.5 is built
+
+ARO 1.5's general, coding, research and translation capabilities are **one base model with four small LoRA adapters**. vLLM loads the base once and serves each adapter under its capability key (`aro-1.5`, `aro-code`, …). One GPU serves the whole generation, and each capability trains and versions independently. Every adapter is trained to identify itself as ARO 1.5.
 
 - **Base model:** `Qwen/Qwen3-4B`, Apache-2.0. A free Colab T4 can fine-tune it. The upgrade path is `Qwen/Qwen3-8B` (also Apache-2.0) once production has a 24 GB GPU.
-- **Unpublished specialists:** if a specialist's adapter isn't published yet, the server answers with ARO 1.5 under the specialist's instructions. The answer is recorded as ARO 1.5's, so training data goes to the model that actually produced it.
+- **Capabilities without a published adapter:** the server answers with ARO 1.5's general weights under the capability's instructions. The answer is recorded under the general capability, so training data goes to the weights that actually produced it.
 
-Vision, Voice and Creative need different architectures, so they are separate specialist models:
+The planned Vision, Voice and Creative capabilities need different architectures. These are the candidate components; they aren't deployed:
 
-| Model | Component | Chosen model | License |
+| Capability | Component | Candidate model | License |
 |---|---|---|---|
-| ARO Vision | vision-language | `Qwen/Qwen3-VL-4B-Instruct` (later `Qwen3-VL-8B`) | Apache-2.0 |
-| ARO Voice | speech-to-text | `openai/whisper-large-v3-turbo` | MIT |
-| ARO Voice | text-to-speech | `hexgrad/Kokoro-82M` | Apache-2.0 |
-| ARO Creative | images | `black-forest-labs/FLUX.1-schnell` (gated: accept terms) | Apache-2.0 |
-| ARO Creative | video | `Wan-AI/Wan2.1-T2V-1.3B` | Apache-2.0 |
-| ARO Creative | music | `ACE-Step/ACE-Step-v1-3.5B` | Apache-2.0 |
-| ARO Translate | baseline to beat | `google/madlad400-3b-mt` | Apache-2.0 |
+| Vision (planned) | vision-language | `Qwen/Qwen3-VL-4B-Instruct` (later `Qwen3-VL-8B`) | Apache-2.0 |
+| Voice (planned) | speech-to-text | `openai/whisper-large-v3-turbo` | MIT |
+| Voice (planned) | text-to-speech | `hexgrad/Kokoro-82M` | Apache-2.0 |
+| Creative (planned) | images | `black-forest-labs/FLUX.1-schnell` (gated: accept terms) | Apache-2.0 |
+| Creative (planned) | video | `Wan-AI/Wan2.1-T2V-1.3B` | Apache-2.0 |
+| Creative (planned) | music | `ACE-Step/ACE-Step-v1-3.5B` | Apache-2.0 |
+| ARO 1.5 · Translate | baseline to beat | `google/madlad400-3b-mt` | Apache-2.0 |
 
 **Known gap:** Kokoro has no African-language voices yet. The obvious alternative, Meta's MMS-TTS, is non-commercial (see below). African text-to-speech needs our own training on permissively licensed recordings.
 
@@ -50,21 +75,21 @@ All licenses below were read from each model's Hugging Face page on 2026-11-22.
 | `stabilityai/stable-diffusion-xl-base-1.0` | OpenRAIL++ | Allowed with use restrictions. Kept as a fallback only. |
 | `Qwen/Qwen2.5-VL-3B-Instruct`, `Qwen/Qwen2.5-3B` | Qwen research license | Not cleared for commercial use. |
 
-## Central model router
+## Central router
 
-The router is in `supabase/functions/_shared/aro.ts`. When a user picks **ARO (Auto)**, it sends:
+The router is in `supabase/functions/_shared/aro.ts`. When a user picks **ARO 1.5 (Auto)**, it picks the capability:
 
-- requests with images to **Vision**
-- translation requests to **Translate**
-- code questions to **Code**
-- maths and science questions to **Research**
-- everything else to **ARO 1.5**
+- requests with images: **Vision** (planned, so these are refused with a clear message for now)
+- translation requests: **translation**
+- code questions: **coding**
+- maths and science questions: **research**
+- everything else: **general**
 
 The routing rules are simple, readable regular expressions, and they are unit-tested.
 
 Before any model is called, the server checks the user's access in Postgres (`aro_authorize`):
-- **The user chose a model directly:** they get a clear refusal: 402 if it isn't in their plan, 429 if the daily limit is used up.
-- **The user chose Auto:** they never get refused. ARO 1.5 answers instead, and the app explains why.
+- **The user chose a capability directly:** they get a clear refusal: 402 if it isn't in their plan, 429 if the daily limit is used up.
+- **The user chose Auto:** they never get refused. ARO 1.5's general capability answers instead, and the app explains why.
 
 If the model fails before answering, the request is refunded.
 
@@ -79,13 +104,13 @@ If the model fails before answering, the request is refunded.
   - withdrawn: MATH, WebVid, LAION
   - generated by models whose terms forbid training competitors: UltraChat, NuminaMath-CoT, parts of Tulu 3
 - **African languages:**
-  - Google **SMOL** (CC-BY-4.0): professional translations for Hausa, Yoruba, Igbo, Nigerian Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu, Xhosa and Arabic. This is ARO Translate's main training source.
+  - Google **SMOL** (CC-BY-4.0): professional translations for Hausa, Yoruba, Igbo, Nigerian Pidgin, Fulfulde, Swahili, Amharic, Wolof, Zulu, Xhosa and Arabic. This is the translation capability's main training source.
   - **Aya** (Apache-2.0): human-written conversations in Hausa, Igbo, Yoruba, Swahili, Amharic, Wolof, Xhosa and Zulu.
 - **User feedback:** used only from users who opted in, and only for answers that ARO itself gave.
 
 ## Quality gate
 
-Every text model has a fixed test set in `training/eval/<model>.jsonl` (15–25 items, including identity and safety items marked *critical*). A new version is published only if:
+Every ARO 1.5 capability has a fixed test set in `training/eval/<id>.jsonl` (15–25 items, including identity and safety items marked *critical*). A new version is published only if:
 
 1. it scores higher than the current version by at least the margin, and
 2. it fails no critical item that the current version passes.
@@ -100,11 +125,14 @@ These go to `training/results/leaderboard.jsonl` and to the admin dashboard's Ev
 
 ## Roadmap
 
-1. **Now:** train ARO 1.5, Code, Research and Translate on Colab, and serve them from one GPU.
-2. **ARO Vision:** deploy `Qwen3-VL-4B-Instruct` with vLLM on a second GPU, set `ARO_VISION_BASE_URL`, and switch the model to `live` in the dashboard.
-3. **ARO Voice:**
-   - add an Edge Function in front of vLLM's speech-to-text endpoint (Whisper) and a Kokoro server
+Generation-level goals live in `models/catalog.json → generations`. Near-term steps:
+
+1. **ARO 1.5:** keep improving its capabilities from opted-in feedback. A new adapter goes live only if it passes the quality gate.
+2. **Vision capability:** deploy `Qwen3-VL-4B-Instruct` with vLLM on a second GPU, set `ARO_VISION_BASE_URL`, attach it to a generation in the catalogue, and switch it to `live` in the dashboard.
+3. **Voice capability:**
+   - add an Edge Function in front of a Whisper speech-to-text endpoint and a Kokoro server
    - fine-tune Whisper on Common Voice and FLEURS for Hausa, Yoruba and Igbo
-4. **ARO Creative:** a credit-billed generation service (FLUX.1-schnell, then Wan2.1 and ACE-Step) behind the same entitlement check.
-5. **Payments:** connect Paystack or Stripe webhooks to the existing `aro_admin_grant_plan`, `aro_admin_grant_model` and `aro_admin_add_credits` functions.
-6. **Before a public commercial launch:** have a lawyer review the dataset and model licenses listed here.
+4. **Creative capability:** a credit-billed generation service (FLUX.1-schnell, then Wan2.1 and ACE-Step) behind the same entitlement check.
+5. **ARO 2.0:** pick and license-check a larger foundation, retrain the capabilities, and release only if it beats ARO 1.5 everywhere.
+6. **Payments:** connect Paystack or Stripe webhooks to the existing `aro_admin_grant_plan`, `aro_admin_grant_model` and `aro_admin_add_credits` functions.
+7. **Before a public commercial launch:** have a lawyer review the dataset and model licenses listed here.
