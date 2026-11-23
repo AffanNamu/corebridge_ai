@@ -70,18 +70,20 @@ curl -fsSL https://raw.githubusercontent.com/AffanNamu/corebridge_ai/aro-ai-v1/t
 ```
 
 The script runs in the background, so it survives closing the terminal. It:
-1. builds the license-gated training data
-2. trains ARO 1.5, Code, Research and Translate
-3. evaluates each against the current version and keeps only the winners
-4. serves them on port 8000
+1. builds the license-gated training data (models with nothing new are skipped)
+2. trains ARO 1.5, Code, Research and Translate, saving checkpoints
+3. evaluates each against the current version, in parallel, and keeps only the winners in `/workspace/aro/live`
+4. **stops the pod** so the GPU isn't billed while idle
 
 Progress is at `https://<POD_ID>-8000.proxy.runpod.net/status.json`, or with `tail -f /workspace/aro/run.log` in the pod. On an RTX 4090 a full first run takes about 3–5 hours.
 
-When it's done:
-1. Put `https://<POD_ID>-8000.proxy.runpod.net/v1` in the Supabase secret `ARO_MODEL_BASE_URL`.
-2. Put the key printed by `cat /workspace/aro/api_key` in `ARO_MODEL_API_KEY`.
+The app is served by a RunPod **Serverless** endpoint that reads `/workspace/aro/live` from the same network volume and scales to zero when nobody is chatting (`training/serverless/aro-models.endpoint.json`, details in [docs/COSTS.md](../docs/COSTS.md)). Supabase points at it once:
+1. `ARO_MODEL_BASE_URL` = `https://api.runpod.ai/v2/<endpoint id>/openai/v1`
+2. `ARO_MODEL_API_KEY` = a RunPod API key restricted to that endpoint
 
-Everything stays on the pod's volume, so re-running the command later starts a new training run and keeps the current versions.
+New versions are picked up at the endpoint's next cold start. A model accepted for the first time must also be added to the endpoint's `VLLM_EXTRA_ARGS` (`--lora-modules <id>=/runpod-volume/aro/live/<id>`).
+
+Cheaper runs: create the pod as **interruptible (spot)** in the volume's data center. If it's interrupted, start it and run the same command; each model resumes from its last checkpoint. `ARO_AUTOSTOP=0` keeps the pod running afterwards; `ARO_SERVE_AFTER=1` serves from the pod as before (billed around the clock).
 
 
 

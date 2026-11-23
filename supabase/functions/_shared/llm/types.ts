@@ -43,10 +43,10 @@ export interface Endpoint {
   extraBody?: Record<string, unknown>;
 }
 
-export interface StreamEvent {
-  type: 'content' | 'thinking';
-  text: string;
-}
+export type StreamEvent =
+  | { type: 'content' | 'thinking'; text: string }
+  /** Token usage for the whole reply, when the provider reports it (last event). */
+  | { type: 'usage'; input: number; output: number; cached?: number };
 
 export class ProviderError extends Error {
   constructor(

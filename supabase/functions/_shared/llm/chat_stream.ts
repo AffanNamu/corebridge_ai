@@ -21,6 +21,18 @@ export interface ChatOptions {
 
 const THINKING_BUDGET = 4000;
 
+/** Claude models from before adaptive thinking (they take a fixed thinking budget). */
+export function usesThinkingBudget(model: string): boolean {
+  return /claude-(3|instant)|claude-(opus|sonnet|haiku)-4-[0-5]\b|claude-(opus|sonnet)-4-?\d{8}|claude-(opus|sonnet|haiku)-4$/.test(model);
+}
+
+/** Thinking settings for the Messages API: adaptive on current models, a budget on older ones. */
+export function anthropicThinking(model: string): Record<string, unknown> {
+  return usesThinkingBudget(model)
+    ? { type: 'enabled', budget_tokens: THINKING_BUDGET }
+    : { type: 'adaptive', display: 'summarized' };
+}
+
 export function streamChat(
   endpoint: Endpoint,
   messages: ChatMessage[],
@@ -94,7 +106,10 @@ async function* streamAnthropic(
       .map((m) => ({ role: m.role, content: toAnthropicContent(m.content) })),
   };
   if (system) body.system = system;
-  if (options.thinking) body.thinking = { type: 'enabled', budget_tokens: THINKING_BUDGET };
+  if (options.thinking) body.thinking = anthropicThinking(endpoint.model);
+  // Prompt caching: the cache breakpoint follows the end of the conversation,
+  // so each new turn re-reads the earlier ones at a tenth of the price.
+  body.cache_control = { type: 'ephemeral' };
 
   const response = await post(
     `${endpoint.baseUrl}/messages`,
@@ -104,6 +119,7 @@ async function* streamAnthropic(
     'Claude API',
   );
 
+  const usage = { input: 0, output: 0, cached: 0 };
   for await (const payload of readSseData(response.body!)) {
     let event: any;
     try {
@@ -114,6 +130,13 @@ async function* streamAnthropic(
     if (event.type === 'error') {
       throw new ProviderError(`Claude API error: ${event.error?.message ?? 'unknown'}`, 502, false);
     }
+    if (event.type === 'message_start' && event.message?.usage) {
+      const u = event.message.usage;
+      usage.cached = (u.cache_read_input_tokens ?? 0);
+      usage.input = (u.input_tokens ?? 0) + usage.cached + (u.cache_creation_input_tokens ?? 0);
+      usage.output = u.output_tokens ?? 0;
+    }
+    if (event.type === 'message_delta' && event.usage?.output_tokens != null) usage.output = event.usage.output_tokens;
     if (event.type !== 'content_block_delta') continue;
     if (event.delta?.type === 'thinking_delta' && event.delta.thinking) {
       yield { type: 'thinking', text: event.delta.thinking };
@@ -121,6 +144,7 @@ async function* streamAnthropic(
       yield { type: 'content', text: event.delta.text };
     }
   }
+  if (usage.input || usage.output) yield { type: 'usage', ...usage };
 }
 
 // ------------------------------------------------- OpenAI-compatible (+ ARO)
@@ -150,6 +174,8 @@ async function* streamOpenAI(
   const body = {
     model: endpoint.model,
     stream: true,
+    // The final chunk then carries token usage (OpenAI, vLLM, DashScope, Gemini's OpenAI surface).
+    stream_options: { include_usage: true },
     messages: messages.map((m) => ({ role: m.role, content: toOpenAIContent(m.content) })),
     ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     ...openAIThinkingFields(endpoint, options.thinking ?? false),
@@ -164,8 +190,9 @@ async function* streamOpenAI(
     label,
   );
 
+  let usage: StreamEvent | undefined;
   for await (const payload of readSseData(response.body!)) {
-    if (payload === '[DONE]') return;
+    if (payload === '[DONE]') break;
     let event: any;
     try {
       event = JSON.parse(payload);
@@ -175,12 +202,21 @@ async function* streamOpenAI(
     if (event.error) {
       throw new ProviderError(`${label} error: ${event.error.message ?? 'unknown'}`, 502, false);
     }
+    if (event.usage && typeof event.usage.prompt_tokens === 'number') {
+      usage = {
+        type: 'usage',
+        input: event.usage.prompt_tokens,
+        output: event.usage.completion_tokens ?? 0,
+        cached: event.usage.prompt_tokens_details?.cached_tokens ?? 0,
+      };
+    }
     const delta = event.choices?.[0]?.delta;
     if (!delta) continue;
     const reasoning = delta.reasoning_content ?? delta.reasoning;
     if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking', text: reasoning };
     if (typeof delta.content === 'string' && delta.content) yield { type: 'content', text: delta.content };
   }
+  if (usage) yield usage;
 }
 
 // ------------------------------------------------------------ Gemini native
@@ -209,6 +245,7 @@ async function* streamGemini(
   const url = `${endpoint.baseUrl}/models/${encodeURIComponent(endpoint.model)}:streamGenerateContent?alt=sse`;
   const response = await post(url, { 'x-goog-api-key': endpoint.apiKey }, body, options, 'Gemini API');
 
+  let usage: StreamEvent | undefined;
   for await (const payload of readSseData(response.body!)) {
     let event: any;
     try {
@@ -219,9 +256,19 @@ async function* streamGemini(
     if (event.error) {
       throw new ProviderError(`Gemini API error: ${event.error.message ?? 'unknown'}`, 502, false);
     }
+    const meta = event.usageMetadata;
+    if (meta && typeof meta.promptTokenCount === 'number') {
+      usage = {
+        type: 'usage',
+        input: meta.promptTokenCount,
+        output: (meta.candidatesTokenCount ?? 0) + (meta.thoughtsTokenCount ?? 0),
+        cached: meta.cachedContentTokenCount ?? 0,
+      };
+    }
     for (const part of event.candidates?.[0]?.content?.parts ?? []) {
       if (typeof part.text !== 'string' || !part.text) continue;
       yield { type: part.thought ? 'thinking' : 'content', text: part.text };
     }
   }
+  if (usage) yield usage;
 }

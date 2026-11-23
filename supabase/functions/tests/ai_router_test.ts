@@ -161,7 +161,9 @@ Deno.test('Claude streams text and thinking deltas, images become base64 blocks'
   assertEquals(out.slice(1, 3), [{ thinking: 'plan' }, { delta: 'A cat.' }]);
   assertEquals(sentHeaders?.get('x-api-key'), 'sk-ant');
   assertEquals(sentBody.system, 'be nice');
-  assertEquals(sentBody.thinking.type, 'enabled');
+  // Current Claude models take adaptive thinking (a fixed budget is a 400 there).
+  assertEquals(sentBody.thinking, { type: 'adaptive', display: 'summarized' });
+  assertEquals(sentBody.cache_control, { type: 'ephemeral' });
   assertEquals(sentBody.messages[0].content[1].source, { type: 'base64', media_type: 'image/png', data: 'AAA' });
 });
 

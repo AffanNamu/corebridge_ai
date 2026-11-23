@@ -12,7 +12,14 @@
 # It runs in the background (closing the terminal is fine). Progress:
 #   https://<POD_ID>-8000.proxy.runpod.net/status.json   while training
 #   tail -f /workspace/aro/run.log                         in the terminal
-# When it finishes, the same port serves the ARO models (OpenAI-compatible API).
+#
+# Cost: when it finishes, accepted versions are in /workspace/aro/live on the
+# network volume — the serverless ARO endpoint (scale to zero) serves them
+# from there — and the pod STOPS ITSELF so the GPU isn't billed while idle.
+#   ARO_SERVE_AFTER=1   keep serving from this pod instead (old behaviour, billed 24/7)
+#   ARO_AUTOSTOP=0      leave the pod running when done
+# Interruptible (spot) pods are fine: training saves checkpoints, and running
+# the script again resumes an interrupted model where it stopped.
 set -uo pipefail
 
 BASE=/workspace/aro
@@ -82,23 +89,38 @@ venv() {  # venv <dir> <packages…>
 status installing "training libraries"
 venv "$BASE/train-venv" unsloth "trl>=0.12" "peft>=0.12" "transformers>=4.51" accelerate bitsandbytes datasets huggingface_hub -e .
 
+STAMP="run-$(date -u +%Y%m%d-%H%M)"
+declare -A RUN_OF
 status preparing "building training data (license-gated): ${MODELS[*]}"
 for M in "${MODELS[@]}"; do
+  RESUME="$BASE/outputs/$M/in_progress"
+  if [ -s "$RESUME" ] && [ -s "$BASE/data/$M/train.jsonl" ] && [ "${ARO_REBUILD:-}" != "1" ]; then
+    RUN_OF[$M]="$(cat "$RESUME")"           # interrupted last time: finish that run
+    say "[$M] resuming ${RUN_OF[$M]}"
+    continue
+  fi
   [ "${ARO_REBUILD:-}" = "1" ] && rm -rf "$BASE/data/$M"
-  "$BASE/train-venv/bin/python" -m aro_training.prepare --model "$M" --no-users --data-dir "$BASE/data" || say "[$M] nothing new to learn"
+  "$BASE/train-venv/bin/python" -m aro_training.prepare --model "$M" --no-users --data-dir "$BASE/data"
+  case $? in
+    0) RUN_OF[$M]="$STAMP"; mkdir -p "$BASE/outputs/$M"; echo "$STAMP" > "$RESUME" ;;
+    2) say "[$M] nothing new to learn — skipped" ;;   # don't retrain on yesterday's file
+    *) say "[$M] preparing data FAILED" ;;
+  esac
 done
 
-STAMP="run-$(date -u +%Y%m%d-%H%M)"
 TRAINED=()
 for M in "${MODELS[@]}"; do
-  [ -s "$BASE/data/$M/train.jsonl" ] || { say "[$M] no data — skipped"; continue; }
+  RUN="${RUN_OF[$M]:-}"
+  [ -n "$RUN" ] && [ -s "$BASE/data/$M/train.jsonl" ] || continue
   status training "$M ($(wc -l < "$BASE/data/$M/train.jsonl") examples)"
   say "[$M] training"
   if "$BASE/train-venv/bin/python" -m aro_training.train --model "$M" \
-       --data "$BASE/data/$M/train.jsonl" --out "$BASE/outputs/$M/$STAMP"; then
+       --data "$BASE/data/$M/train.jsonl" --out "$BASE/outputs/$M/$RUN"; then
     TRAINED+=("$M")
+    rm -f "$BASE/outputs/$M/in_progress"
+    rm -rf "$BASE/outputs/$M/$RUN/checkpoints"     # the adapter is saved; free the volume
   else
-    say "[$M] training FAILED"
+    say "[$M] training FAILED (run again to resume from the last checkpoint)"
   fi
 done
 
@@ -124,7 +146,7 @@ serve() {  # serve [candidates]: starts vLLM on :8000 with the adapters in $BASE
 }
 
 CANDS=""
-for M in "${TRAINED[@]}"; do CANDS="${CANDS:+$CANDS,}$M=$BASE/outputs/$M/$STAMP/adapter"; done
+for M in "${TRAINED[@]}"; do CANDS="${CANDS:+$CANDS,}$M=$BASE/outputs/$M/${RUN_OF[$M]}/adapter"; done
 
 if [ -n "$CANDS" ]; then
   status evaluating "comparing new versions with the current ones"
@@ -134,8 +156,10 @@ if [ -n "$CANDS" ]; then
       if [ -d "$BASE/live/$M" ] && [[ " $SERVED " == *" $M "* ]]; then CURRENT="$M"; else CURRENT="aro-1.5"; fi
       say "[$M] evaluating against $CURRENT"
       if python -m aro_training.evaluate --model "$M" --base-url http://localhost:8000/v1 --api-key "$ARO_MODEL_API_KEY" \
-           --candidate "$M-candidate" --current "$CURRENT" --report "$BASE/outputs/$M/$STAMP/eval_report.json"; then
-        rm -rf "$BASE/live/$M"; mkdir -p "$BASE/live"; cp -r "$BASE/outputs/$M/$STAMP/adapter" "$BASE/live/$M"
+           --candidate "$M-candidate" --current "$CURRENT" --report "$BASE/outputs/$M/${RUN_OF[$M]}/eval_report.json"; then
+        # Swap in place: workers that start later load the new version.
+        rm -rf "$BASE/live/$M.new"; mkdir -p "$BASE/live"; cp -r "$BASE/outputs/$M/${RUN_OF[$M]}/adapter" "$BASE/live/$M.new"
+        rm -rf "$BASE/live/$M"; mv "$BASE/live/$M.new" "$BASE/live/$M"
         say "[$M] ✅ new version accepted"
       else
         say "[$M] kept the current version"
@@ -146,10 +170,24 @@ if [ -n "$CANDS" ]; then
   fi
 fi
 
-# ------------------------------------------------------------- 3. serve
+# ---------------------------------------------- 3. hand over and stop
+if [ "${ARO_SERVE_AFTER:-}" != "1" ]; then
+  status done "finished — accepted versions are in $BASE/live: $(ls "$BASE/live" 2>/dev/null | tr '\n' ' ')"
+  say "Done. Adapters in $BASE/live: $(ls "$BASE/live" 2>/dev/null | tr '\n' ' ')"
+  say "The serverless ARO endpoint loads them from the network volume at its next cold start."
+  say "A newly accepted model must be listed in the endpoint's VLLM_EXTRA_ARGS (--lora-modules name=/runpod-volume/aro/live/name)."
+  kill "$STATUS_SERVER" 2>/dev/null
+  if [ "${ARO_AUTOSTOP:-1}" = "1" ] && [ -n "${RUNPOD_POD_ID:-}" ] && command -v runpodctl > /dev/null; then
+    say "Stopping this pod so the GPU isn't billed while idle (ARO_AUTOSTOP=0 to keep it)."
+    sleep 5
+    runpodctl pod stop "$RUNPOD_POD_ID" || runpodctl stop pod "$RUNPOD_POD_ID" || say "Could not stop the pod — stop it in the RunPod console."
+  fi
+  exit 0
+fi
+
 status serving "starting the ARO model server"
 if serve ""; then
-  say "ARO is being served on port 8000."
+  say "ARO is being served on port 8000 (billed while this pod runs)."
   say "Models: $(curl -sf -H "Authorization: Bearer $ARO_MODEL_API_KEY" http://localhost:8000/v1/models | python3 -c "import json,sys; print(', '.join(m['id'] for m in json.load(sys.stdin)['data']))")"
   say "URL for Supabase (ARO_MODEL_BASE_URL): https://${RUNPOD_POD_ID:-<POD_ID>}-8000.proxy.runpod.net/v1"
   say "API key for Supabase (ARO_MODEL_API_KEY): run   cat $KEY_FILE   in this terminal"

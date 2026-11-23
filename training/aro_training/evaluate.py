@@ -15,6 +15,17 @@ AND fails no "critical" item (identity, safety) that the current one passes.
 
     python -m aro_training.evaluate --model aro-code --base-url http://localhost:8000/v1 \
         --candidate aro-code-candidate --current aro-code
+
+Requests are sent in parallel (ARO_EVAL_CONCURRENCY, default 8) so vLLM's
+continuous batching answers them together: the GPU is rented for minutes,
+not the sum of every answer. Use --concurrency 1 to measure latency.
+
+Comparing two servers — e.g. an FP8-quantized server (candidate, --base-url)
+against the bf16 one (current, --current-base-url) — uses the same gate, so a
+cheaper serving setup is only adopted if quality holds:
+
+    python -m aro_training.evaluate --model aro-1.5 --base-url http://localhost:8001/v1 \
+        --current-base-url http://localhost:8000/v1 --candidate aro-1.5 --current aro-1.5
 """
 
 from __future__ import annotations
@@ -27,6 +38,7 @@ import statistics
 import sys
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -219,16 +231,20 @@ def run(
     eval_path: Path | None = None,
     margin: float = CONFIG.promote_margin,
     model_id: str = "aro-1.5",
+    current_base_url: str | None = None,
+    concurrency: int | None = None,
 ) -> Decision:
     model = model_spec(model_id)
-    rng = random.Random(7)
-    results: list[ItemResult] = []
-    for item in load_eval_set(eval_path or model.eval_set):
+    workers = concurrency or int(os.environ.get("ARO_EVAL_CONCURRENCY", "8"))
+
+    def score(item: dict[str, Any]) -> ItemResult:
         messages = [{"role": "system", "content": model.system_prompt}, {"role": "user", "content": item["prompt"]}]
         cand_answer, cand_s, cand_tok = chat_timed(base_url, candidate, messages, api_key)
-        curr_answer, curr_s, curr_tok = chat_timed(base_url, current, messages, api_key)
+        curr_answer, curr_s, curr_tok = chat_timed(current_base_url or base_url, current, messages, api_key)
+        # Seeded per item, so results don't depend on the order threads finish in.
+        rng = random.Random(f"7:{item['id']}")
         verdict = judge_pair(item["prompt"], cand_answer, curr_answer, judge, rng) if judge else None
-        results.append(ItemResult(
+        return ItemResult(
             id=item["id"],
             category=item.get("category", "general"),
             critical=bool(item.get("critical")),
@@ -239,7 +255,11 @@ def run(
             current_latency_s=round(curr_s, 3),
             candidate_tokens=cand_tok,
             current_tokens=curr_tok,
-        ))
+        )
+
+    items = load_eval_set(eval_path or model.eval_set)
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        results = list(pool.map(score, items))  # keeps the test-set order
     decision = decide(results, margin)
     decision.model = model_id
     return decision
@@ -293,6 +313,8 @@ def main() -> None:
     parser.add_argument("--judge-model")
     parser.add_argument("--judge-key", default="none")
     parser.add_argument("--report", default="outputs/eval_report.json")
+    parser.add_argument("--current-base-url", default=None, help="Server of the current version, if different")
+    parser.add_argument("--concurrency", type=int, default=None, help="Parallel requests (default ARO_EVAL_CONCURRENCY or 8)")
     args = parser.parse_args()
 
     judge = (
@@ -301,7 +323,8 @@ def main() -> None:
         else None
     )
     current = args.current or model_spec(args.model).served_name
-    decision = run(args.base_url, args.candidate, current, args.api_key, judge, model_id=args.model)
+    decision = run(args.base_url, args.candidate, current, args.api_key, judge, model_id=args.model,
+                   current_base_url=args.current_base_url, concurrency=args.concurrency)
     Path(args.report).parent.mkdir(parents=True, exist_ok=True)
     Path(args.report).write_text(json.dumps(asdict(decision), indent=2))
     record(decision, candidate_label=str(Path(args.report).parent.name))

@@ -92,3 +92,7 @@ The full details are in [training/README.md](../training/README.md).
    - a provenance manifest with checksums
 3. **train:** a QLoRA fine-tune of Qwen3-4B, one LoRA adapter per model. **evaluate:** compares the new version with the current one on that model's fixed test set, recording scores, latency and tokens/s.
 4. **promote:** if the new version is better, it is published to that model's private Hugging Face repo, with a one-step rollback. One vLLM server then serves all four adapters.
+
+## Costs
+
+Rate limits, prompt and response caching, agent caps, scale-to-zero serving, the GPU budget with alerts and per-request cost traces are described in [COSTS.md](COSTS.md).

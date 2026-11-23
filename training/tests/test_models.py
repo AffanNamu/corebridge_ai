@@ -181,3 +181,52 @@ def test_leaderboard_record_and_comparison_table(tmp_path, monkeypatch):
 def test_translate_trains_for_more_passes():
     assert spec("aro-translate").epochs == 2.0
     assert spec("aro-1.5").epochs == 1.0
+
+
+def test_vllm_command_caches_prefixes_and_quantizes_only_when_asked():
+    cmd = serve.build_command({}, "Qwen/Qwen3-4B")
+    assert "--enable-prefix-caching" in cmd and "--quantization" not in cmd
+    fp8 = serve.build_command({}, "Qwen/Qwen3-4B", quantization="fp8", kv_cache_dtype="fp8")
+    assert fp8[fp8.index("--quantization") + 1] == "fp8" and fp8[fp8.index("--kv-cache-dtype") + 1] == "fp8"
+
+
+def test_interrupted_training_resumes_from_the_newest_complete_checkpoint(tmp_path):
+    from aro_training.train import latest_checkpoint
+
+    assert latest_checkpoint(tmp_path / "missing") is None
+    for step, complete in [(100, True), (300, True), (400, False)]:
+        d = tmp_path / f"checkpoint-{step}"
+        d.mkdir()
+        if complete:
+            (d / "trainer_state.json").write_text("{}")
+    assert latest_checkpoint(tmp_path).name == "checkpoint-300"
+
+
+def test_evaluation_runs_in_parallel_keeps_order_and_can_compare_two_servers(monkeypatch):
+    import threading
+    import time as _time
+
+    from aro_training import evaluate
+
+    calls: list[tuple[str, str]] = []
+    active, peak = 0, 0
+    lock = threading.Lock()
+
+    def fake_chat(base_url, model, messages, api_key="none", max_tokens=800):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+            calls.append((base_url, model))
+        _time.sleep(0.01)
+        with lock:
+            active -= 1
+        return ("I'm ARO 1.5." if model == "cand" else "I am Qwen."), 0.01, 5
+
+    monkeypatch.setattr(evaluate, "chat_timed", fake_chat)
+    decision = evaluate.run("http://new/v1", "cand", "curr", model_id="aro-1.5",
+                            current_base_url="http://old/v1", concurrency=8)
+    ids = [i["id"] for i in load_eval_set(spec("aro-1.5").eval_set)]
+    assert [r.id for r in decision.items] == ids
+    assert peak > 1, "requests overlap so vLLM can batch them"
+    assert {("http://new/v1", "cand"), ("http://old/v1", "curr")} == set(calls)

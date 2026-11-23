@@ -42,6 +42,18 @@ def _filter_kwargs(cls: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in kwargs.items() if k in accepted}
 
 
+def _save_steps() -> int:
+    return int(os.environ.get("ARO_SAVE_STEPS", "100"))
+
+
+def latest_checkpoint(checkpoints: Path) -> Path | None:
+    """The newest complete checkpoint-<step> directory, if a previous run was interrupted."""
+    if not checkpoints.is_dir():
+        return None
+    done = [d for d in checkpoints.glob("checkpoint-*") if d.is_dir() and (d / "trainer_state.json").exists()]
+    return max(done, key=lambda d: int(d.name.split("-")[-1]), default=None)
+
+
 def train(
     data_path: str,
     out_dir: str,
@@ -94,7 +106,11 @@ def train(
         "warmup_ratio": 0.03,
         "weight_decay": 0.01,
         "logging_steps": 10,
-        "save_strategy": "no",
+        # Checkpoints let a run on an interruptible (spot) GPU resume where it
+        # stopped instead of starting over. ARO_SAVE_STEPS=0 turns them off.
+        "save_strategy": "steps" if _save_steps() else "no",
+        "save_steps": _save_steps() or 500,
+        "save_total_limit": 1,
         "optim": "adamw_8bit",
         "seed": 3407,
         "report_to": "none",
@@ -114,7 +130,10 @@ def train(
     )
 
     started = time.time()
-    stats = trainer.train()
+    resume = latest_checkpoint(Path(out_dir) / "checkpoints")
+    if resume:
+        print(f"Resuming from {resume}")
+    stats = trainer.train(resume_from_checkpoint=str(resume) if resume else None)
 
     adapter_dir = Path(out_dir) / "adapter"
     model.save_pretrained(str(adapter_dir))

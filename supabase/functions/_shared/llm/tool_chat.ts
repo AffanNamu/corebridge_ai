@@ -42,6 +42,8 @@ export interface AssistantTurn {
   toolCalls: ToolCall[];
   raw: unknown;
   rawKind: string;
+  /** Tokens this turn used, when the provider reports them. */
+  usage?: { input: number; output: number; cached?: number };
 }
 
 export interface ToolChatOptions {
@@ -143,7 +145,11 @@ async function anthropicTurn(
     {
       model: endpoint.model,
       max_tokens: options.maxTokens ?? 8192,
-      system,
+      // Prompt caching: tools + system prompt never change within a session
+      // (explicit breakpoint), and the automatic breakpoint follows the growing
+      // transcript, so each step re-reads earlier steps at a tenth of the price.
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      cache_control: { type: 'ephemeral' },
       tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })),
       messages: toAnthropicMessages(transcript),
     },
@@ -159,6 +165,14 @@ async function anthropicTurn(
       .map((b) => ({ id: String(b.id), name: String(b.name), args: isObject(b.input) ? b.input : {} })),
     raw: blocks,
     rawKind: 'anthropic',
+    usage: data.usage
+      ? {
+        input: (data.usage.input_tokens ?? 0) + (data.usage.cache_read_input_tokens ?? 0) +
+          (data.usage.cache_creation_input_tokens ?? 0),
+        output: data.usage.output_tokens ?? 0,
+        cached: data.usage.cache_read_input_tokens ?? 0,
+      }
+      : undefined,
   };
 }
 
@@ -246,6 +260,13 @@ async function openAITurn(
     toolCalls,
     raw,
     rawKind: 'openai',
+    usage: data.usage
+      ? {
+        input: data.usage.prompt_tokens ?? 0,
+        output: data.usage.completion_tokens ?? 0,
+        cached: data.usage.prompt_tokens_details?.cached_tokens ?? 0,
+      }
+      : undefined,
   };
 }
 

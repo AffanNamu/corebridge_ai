@@ -5,7 +5,9 @@
 // Request body (POST, JSON): { action, ...params }
 //   config                                         models, plans, limits, products, credit packs
 //   updateModel     { id, patch: { status?, name?, tagline?, chat_selectable?, credit_cost?, ... } }
-//   upsertPlan      { plan: { id, name?, price_minor?, currency?, priority?, active?, sort? } }
+//   upsertPlan      { plan: { id, name?, price_minor?, currency?, priority?, active?, sort?,
+//                             requests_per_minute?, requests_per_hour?, max_output_tokens?,
+//                             agent_max_steps?, agent_max_tokens? } }
 //   setPlanModel    { planId, modelId, included, dailyLimit? (null = no cap) }
 //   upsertProduct   { product: { id, model_id, name, price_minor, duration_days, daily_limit?, active? } }
 //   upsertCreditPack{ pack: { id, name, credits, price_minor, active? } }
@@ -15,6 +17,10 @@
 //   userOverview    { userId }
 //   usage           { days? }
 //   evaluations     { modelId?, limit? }
+//   costs           { days? }                       GPU spend per day/model, top users, budget alerts
+//   updateCostSettings { patch: { daily_budget_usd?, hard_budget_usd?, alert_thresholds?,
+//                                 gpu_usd_per_second?, fallback_usd_per_mtok_in?, fallback_usd_per_mtok_out?,
+//                                 cache_ttl_seconds? } }
 
 import { type Db, dbFromEnv } from '../_shared/db.ts';
 import { isAdmin } from '../_shared/entitlements.ts';
@@ -77,6 +83,35 @@ function modelPatch(raw: Record<string, unknown>): Record<string, unknown> {
   return patch;
 }
 
+function money(value: unknown, field: string, max: number): number {
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > max) throw new BadRequest(`Invalid ${field}`);
+  return n;
+}
+
+function costPatch(raw: Record<string, unknown>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if ('daily_budget_usd' in raw) patch.daily_budget_usd = money(raw.daily_budget_usd, 'daily_budget_usd', 100_000);
+  if ('hard_budget_usd' in raw) patch.hard_budget_usd = money(raw.hard_budget_usd, 'hard_budget_usd', 100_000);
+  if ('gpu_usd_per_second' in raw) patch.gpu_usd_per_second = money(raw.gpu_usd_per_second, 'gpu_usd_per_second', 1);
+  for (const key of ['fallback_usd_per_mtok_in', 'fallback_usd_per_mtok_out']) {
+    if (key in raw) patch[key] = money(raw[key], key, 1_000);
+  }
+  if ('cache_ttl_seconds' in raw) patch.cache_ttl_seconds = int(raw.cache_ttl_seconds, 'cache_ttl_seconds', { max: 7 * 86_400 });
+  if ('alert_thresholds' in raw) {
+    const list = raw.alert_thresholds;
+    if (!Array.isArray(list) || list.length > 10 || list.some((t) => typeof t !== 'number' || t <= 0 || t > 10)) {
+      throw new BadRequest('alert_thresholds must be up to 10 fractions of the budget, e.g. [0.5, 0.8, 1]');
+    }
+    patch.alert_thresholds = list;
+  }
+  const daily = patch.daily_budget_usd as number | undefined;
+  const hard = patch.hard_budget_usd as number | undefined;
+  if (daily !== undefined && hard !== undefined && hard < daily) throw new BadRequest('hard_budget_usd must be at least daily_budget_usd');
+  if (Object.keys(patch).length === 0) throw new BadRequest('Nothing to change');
+  return patch;
+}
+
 async function run(db: Db, admin: string, body: Record<string, unknown>): Promise<unknown> {
   switch (body.action) {
     case 'config':
@@ -94,6 +129,13 @@ async function run(db: Db, admin: string, body: Record<string, unknown>): Promis
       if ('priority' in plan) clean.priority = int(plan.priority, 'priority', { max: 1000 });
       if ('active' in plan) clean.active = plan.active === true;
       if ('sort' in plan) clean.sort = int(plan.sort, 'sort', { max: 1000 });
+      const guardrails: [string, number, number][] = [
+        ['requests_per_minute', 1, 10_000], ['requests_per_hour', 1, 1_000_000], ['max_output_tokens', 64, 32_768],
+        ['agent_max_steps', 1, 200], ['agent_max_tokens', 1_000, 100_000_000],
+      ];
+      for (const [key, min, max] of guardrails) {
+        if (key in plan) clean[key] = int(plan[key], key, { min, max });
+      }
       return db.rpc('aro_admin_upsert_plan', { p_admin: admin, p_plan: clean });
     }
     case 'setPlanModel':
@@ -158,6 +200,10 @@ async function run(db: Db, admin: string, body: Record<string, unknown>): Promis
         p_model: body.modelId ? id(body.modelId, 'modelId') : null,
         p_limit: int(body.limit ?? 50, 'limit', { min: 1, max: 500 }),
       });
+    case 'costs':
+      return db.rpc('aro_admin_costs', { p_days: int(body.days ?? 7, 'days', { min: 1, max: 365 }) });
+    case 'updateCostSettings':
+      return db.rpc('aro_admin_update_cost_settings', { p_admin: admin, p_patch: costPatch(object(body.patch, 'patch')) });
     default:
       throw new BadRequest('Unknown action');
   }

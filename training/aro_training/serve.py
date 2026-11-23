@@ -43,10 +43,20 @@ def build_command(
     bf16: bool = True,
     candidate: str | None = None,
     candidates: dict[str, Path | str] | None = None,
+    quantization: str | None = None,
+    kv_cache_dtype: str | None = None,
 ) -> list[str]:
+    # Prefix caching: the system prompt and earlier turns (and the agent's
+    # growing transcript) are computed once and reused across requests.
     cmd = ["vllm", "serve", base_model, "--host", "0.0.0.0", "--port", str(port), "--max-model-len", str(max_len),
            "--enable-auto-tool-choice", "--tool-call-parser", "hermes", "--reasoning-parser", "qwen3",
-           "--dtype", "bfloat16" if bf16 else "half"]
+           "--dtype", "bfloat16" if bf16 else "half", "--enable-prefix-caching"]
+    # Opt-in, after the eval gate says quality holds (evaluate.py --current-base-url):
+    # fp8 weights roughly halve memory and speed up decoding on Ada/Hopper GPUs.
+    if quantization:
+        cmd += ["--quantization", quantization]
+    if kv_cache_dtype:
+        cmd += ["--kv-cache-dtype", kv_cache_dtype]
     if api_key:
         cmd += ["--api-key", api_key]
     modules = [f"{name}={path}" for name, path in adapters.items()]
@@ -90,6 +100,8 @@ def main() -> None:
         bf16=bf16,
         candidate=os.environ.get("ARO_CANDIDATE") or None,
         candidates=parse_candidates(os.environ.get("ARO_CANDIDATES", "")),
+        quantization=os.environ.get("ARO_QUANTIZATION") or None,
+        kv_cache_dtype=os.environ.get("ARO_KV_CACHE_DTYPE") or None,
     )
     print(shlex.join(cmd))
 

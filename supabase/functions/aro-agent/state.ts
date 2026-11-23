@@ -81,9 +81,11 @@ const MAX_TRANSCRIPT_CHARS = 250_000;
 
 /**
  * Shortens old tool results so long sessions stay within model context and
- * Firestore's 1 MB document limit. Recent messages are kept in full.
+ * Firestore's 1 MB document limit. Recent messages are kept in full unless
+ * `maxChars` (a model with a small context window) still doesn't fit them.
  */
-export function compactTranscript(transcript: AgentMessage[]): AgentMessage[] {
+export function compactTranscript(transcript: AgentMessage[], maxChars = MAX_TRANSCRIPT_CHARS): AgentMessage[] {
+  const limit = Math.min(maxChars, MAX_TRANSCRIPT_CHARS);
   const compacted = transcript.map((message, index) => {
     if (message.role !== 'tool' || index >= transcript.length - KEEP_FULL) return message;
     return {
@@ -98,13 +100,34 @@ export function compactTranscript(transcript: AgentMessage[]): AgentMessage[] {
 
   // Still too large: drop the oldest exchanges but keep the first task.
   let size = JSON.stringify(compacted).length;
-  while (size > MAX_TRANSCRIPT_CHARS && compacted.length > KEEP_FULL + 1) {
+  while (size > limit && compacted.length > KEEP_FULL + 1) {
     const removed = compacted.splice(1, 1);
     size -= JSON.stringify(removed).length;
     // Never leave tool results without the assistant call that produced them.
     while (compacted.length > 1 && compacted[1].role === 'tool') {
       size -= JSON.stringify(compacted.splice(1, 1)).length;
     }
+  }
+
+  // Recent tool output alone is too big (e.g. several large files): shorten
+  // the largest results until it fits.
+  while (size > limit) {
+    let target: { m: number; r: number; len: number } | undefined;
+    compacted.forEach((message, m) => {
+      if (message.role !== 'tool') return;
+      message.results.forEach((result, r) => {
+        if (result.content.length > OLD_RESULT_CHARS + 500 && (!target || result.content.length > target.len)) {
+          target = { m, r, len: result.content.length };
+        }
+      });
+    });
+    if (!target) break;
+    const message = compacted[target.m] as Extract<AgentMessage, { role: 'tool' }>;
+    const result = message.results[target.r];
+    const keep = Math.max(OLD_RESULT_CHARS, result.content.length - (size - limit) - 200);
+    const shortened = `${result.content.slice(0, keep)}\n… (output shortened to fit the model — read a smaller range if needed)`;
+    compacted[target.m] = { role: 'tool', results: message.results.map((x, i) => (i === target!.r ? { ...x, content: shortened } : x)) };
+    size -= result.content.length - shortened.length;
   }
   return compacted;
 }

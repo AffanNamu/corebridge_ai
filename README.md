@@ -61,7 +61,8 @@ supabase functions deploy ai-router aro-agent aro-admin file-process export-arti
 From the admin dashboard you set real prices, change daily limits, switch models live, and grant plans or credits.
 
 **ARO models need a model server:**
-- They answer once `ARO_MODEL_BASE_URL` points to a running ARO server. One server serves ARO 1.5, Code, Research and Translate.
+- They answer once `ARO_MODEL_BASE_URL` points to a running ARO server. One server serves ARO 1.5, Code, Research and Translate; in production it's a RunPod Serverless endpoint that scales to zero.
+- Cost controls (rate limits, agent caps, caching, GPU budget with alerts, per-request cost traces): [docs/COSTS.md](docs/COSTS.md).
 - To start one on free Colab, see [training/README.md](training/README.md).
 - Until then, the app says ARO is offline, or uses the backup model if you set `ARO_FALLBACK_*`.
 - Every ARO request is checked against the user's plan, so the database migrations from the first command are required.

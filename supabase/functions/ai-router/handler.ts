@@ -11,18 +11,37 @@
 // router then picks the specialist. Every ARO request is checked against
 // the user's plan in Postgres before any model is called.
 //
+// Cost guardrails (see _shared/cost.ts and docs/COSTS.md): every request is
+// rate-limited per plan; ARO requests also respect the daily GPU budget, get
+// a per-plan answer-length cap, are fitted to ARO's context window, may be
+// answered from the exact-match cache, and every model call is logged with
+// tokens, latency and estimated cost under a trace id.
+//
 // 'complete' replies with SSE frames:
-//   data: {"meta": {"servedBy", "model", "aroModel"?, "routed"?, "notice"?, "usage"?}}
+//   data: {"meta": {"servedBy", "model", "traceId", "aroModel"?, "routed"?, "notice"?, "usage"?, "cached"?}}
 //   data: {"thinking": "..."}   // reasoning, when the provider exposes it
 //   data: {"delta": "..."}      // answer text
 //   data: {"error": "..."}
 //   data: [DONE]
 
 import { type AroResolution, canTryNext, resolveAro } from '../_shared/aro.ts';
+import {
+  aroContextTokens,
+  cacheable,
+  cacheGet,
+  cacheKey,
+  cachePut,
+  fitToContext,
+  gate,
+  GateError,
+  type GateResult,
+  logUsage,
+  type Usage,
+} from '../_shared/cost.ts';
 import { type Db, dbFromEnv } from '../_shared/db.ts';
 import { isAdmin, overview, refund } from '../_shared/entitlements.ts';
 import type { VerifiedUser } from '../_shared/firebase-auth.ts';
-import { CORS_HEADERS, errorResponse, jsonResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
+import { CORS_HEADERS, jsonResponse, SSE_DONE, SSE_HEADERS, sseFrame } from '../_shared/http.ts';
 import { streamChat } from '../_shared/llm/chat_stream.ts';
 import { Capability, listModels } from '../_shared/llm/list_models.ts';
 import { resolveEndpoints } from '../_shared/llm/providers.ts';
@@ -38,6 +57,16 @@ export interface RouterDeps {
 
 const MAX_MESSAGES = 200;
 const MAX_TOTAL_CHARS = 400_000;
+const DEFAULT_ARO_MAX_TOKENS = 2048;
+/** Room kept for the chat template and tokenizer differences. */
+const CONTEXT_MARGIN_TOKENS = 256;
+const MAX_CACHED_ANSWER_CHARS = 20_000;
+
+function errorResponse(message: string, status: number, retryAfter?: number): Response {
+  const response = jsonResponse({ error: message }, status);
+  if (retryAfter) response.headers.set('retry-after', String(retryAfter));
+  return response;
+}
 
 export async function handleRequest(req: Request, deps: RouterDeps): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
@@ -83,6 +112,14 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   const messages = parseMessages(body.messages);
   if (typeof messages === 'string') return errorResponse(messages, 400);
 
+  // Rate limits for every provider; the GPU budget only for ARO's own models.
+  let limits: GateResult;
+  try {
+    limits = await gate(db, user.uid, provider === 'aro');
+  } catch (err) {
+    return providerErrorResponse(err);
+  }
+
   let endpoints: Endpoint[];
   let aro: AroResolution | undefined;
   try {
@@ -96,15 +133,29 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
     return providerErrorResponse(err);
   }
 
-  const finalMessages: ChatMessage[] = aro
+  let finalMessages: ChatMessage[] = aro
     ? [{ role: 'system', content: aro.systemPrompt }, ...messages.filter((m) => m.role !== 'system')]
     : messages;
   const thinking = body.thinkingEnabled === true;
-  const metaExtra = aro
+
+  // ARO: cap the answer length by plan and keep the conversation inside the context window.
+  let maxTokens: number | undefined;
+  let trimmed = 0;
+  if (aro) {
+    maxTokens = limits.max_output_tokens ?? DEFAULT_ARO_MAX_TOKENS;
+    const fit = fitToContext(finalMessages, aroContextTokens(env) - maxTokens - CONTEXT_MARGIN_TOKENS);
+    finalMessages = fit.messages;
+    trimmed = fit.droppedMessages + (fit.truncated ? 1 : 0);
+  }
+
+  const traceId = crypto.randomUUID();
+  const metaExtra: Record<string, unknown> = aro
     ? {
+      traceId,
       aroModel: aro.aroModel,
       routed: aro.routed,
       ...(aro.notice ? { notice: aro.notice } : {}),
+      ...(trimmed ? { trimmed } : {}),
       usage: {
         plan: aro.authorization.plan,
         via: aro.authorization.via,
@@ -113,19 +164,50 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
         credits: aro.authorization.credits ?? null,
       },
     }
-    : {};
+    : { traceId };
+
+  const useCache = aro !== undefined && body.cache !== false && cacheable(finalMessages, thinking);
+  const key = useCache ? await cacheKey(`${aro!.aroModel}\n${aro!.systemPrompt}`, finalMessages) : '';
+  const logBase = {
+    traceId, userId: user.uid, surface: 'chat' as const, provider, aroModel: aro?.aroModel,
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let answered = false;
+      const started = Date.now();
+      let served: Endpoint | undefined;
+      let usage: Usage | undefined;
       try {
-        await streamWithFallback(endpoints, finalMessages, thinking, deps.fetchImpl, (frame) => {
+        const hit = useCache ? await cacheGet(db, key) : null;
+        if (hit !== null) {
+          answered = true;
+          served = endpoints[0];
+          controller.enqueue(sseFrame({ meta: { servedBy: 'aro', model: served.model, ...metaExtra, cached: true } }));
+          controller.enqueue(sseFrame({ delta: hit }));
+          await logUsage(db, { ...logBase, model: served.model, servedBy: 'aro', latencyMs: Date.now() - started, status: 'cache_hit' }, env, deps.fetchImpl);
+          return;
+        }
+
+        let answer = '';
+        const result = await streamWithFallback(endpoints, finalMessages, thinking, deps.fetchImpl, (frame) => {
           answered = true;
           controller.enqueue(frame);
-        }, metaExtra);
+        }, metaExtra, {
+          maxTokens,
+          onText: useCache ? (text) => { if (answer.length <= MAX_CACHED_ANSWER_CHARS) answer += text; } : undefined,
+        });
+        served = result.endpoint;
+        usage = result.usage;
+        await logUsage(db, { ...logBase, model: served.model, servedBy: served.servedBy, usage, latencyMs: Date.now() - started }, env, deps.fetchImpl);
+        if (useCache && served.servedBy === 'aro' && answer.trim() && answer.length <= MAX_CACHED_ANSWER_CHARS) {
+          await cachePut(db, key, aro!.aroModel, answer);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown streaming error';
         controller.enqueue(sseFrame({ error: message }));
+        const failed = served ?? (err as { endpoint?: Endpoint }).endpoint ?? endpoints[0];
+        await logUsage(db, { ...logBase, model: failed.model, servedBy: failed.servedBy, usage, latencyMs: Date.now() - started, status: 'error' }, env, deps.fetchImpl);
         // Nothing was answered: give the request (or credits) back.
         if (aro && db && !answered) {
           await refund(db, user.uid, aro.aroModel, aro.authorization.via).catch((e) =>
@@ -142,10 +224,16 @@ export async function handleRequest(req: Request, deps: RouterDeps): Promise<Res
   return new Response(stream, { headers: SSE_HEADERS });
 }
 
+export interface StreamOptions {
+  maxTokens?: number;
+  /** Called with each piece of answer text (not thinking). */
+  onText?: (text: string) => void;
+}
+
 /**
  * Tries each endpoint in order. Moves to the next one only if the current
  * one failed before producing any output, so users never see two answers
- * glued together.
+ * glued together. Returns the endpoint that answered and its token usage.
  */
 export async function streamWithFallback(
   endpoints: Endpoint[],
@@ -154,22 +242,31 @@ export async function streamWithFallback(
   fetchImpl: typeof fetch | undefined,
   emit: (frame: Uint8Array) => void,
   metaExtra: Record<string, unknown> = {},
-): Promise<void> {
+  options: StreamOptions = {},
+): Promise<{ endpoint: Endpoint; usage?: Usage }> {
   let lastError: unknown;
   for (const [index, endpoint] of endpoints.entries()) {
     let started = false;
+    let usage: Usage | undefined;
+    const meta = () => sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model, ...metaExtra } });
     try {
-      for await (const event of streamChat(endpoint, messages, { thinking, fetchImpl })) {
+      for await (const event of streamChat(endpoint, messages, { thinking, fetchImpl, maxTokens: options.maxTokens })) {
+        if (event.type === 'usage') {
+          usage = { input: event.input, output: event.output, cached: event.cached };
+          continue;
+        }
         if (!started) {
           started = true;
-          emit(sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model, ...metaExtra } }));
+          emit(meta());
         }
+        if (event.type === 'content') options.onText?.(event.text);
         emit(sseFrame(event.type === 'thinking' ? { thinking: event.text } : { delta: event.text }));
       }
-      if (!started) emit(sseFrame({ meta: { servedBy: endpoint.servedBy, model: endpoint.model, ...metaExtra } }));
-      return;
+      if (!started) emit(meta());
+      return { endpoint, usage };
     } catch (err) {
       lastError = err;
+      if (err && typeof err === 'object') (err as { endpoint?: Endpoint }).endpoint = endpoint;
       const canRetry = !started && canTryNext(err) && index < endpoints.length - 1;
       if (!canRetry) throw err;
       console.warn(`ai-router: ${endpoint.servedBy} failed, trying next endpoint: ${(err as Error).message}`);
@@ -215,6 +312,7 @@ export function parseMessages(raw: unknown): ChatMessage[] | string {
 }
 
 function providerErrorResponse(err: unknown): Response {
+  if (err instanceof GateError) return errorResponse(err.message, 429, err.gate.retry_after_s);
   if (err instanceof ProviderError) return errorResponse(err.message, err.status >= 400 ? err.status : 502);
   return errorResponse(err instanceof Error ? err.message : 'Unknown error', 500);
 }
