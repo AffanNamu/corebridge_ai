@@ -272,12 +272,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Every build of master (and every version tag or manual run) is published
+      # as a GitHub Release, so the APK and AAB appear under Releases.
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version_name }}
+          target_commitish: ${{ github.sha }}
           name: ARO AI v${{ steps.version.outputs.version_name }}
+          make_latest: true
           generate_release_notes: true
           files: |
             apps/mobile/release_output/*.apk

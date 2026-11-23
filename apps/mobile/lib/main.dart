@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'core/di/providers.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_cache.dart';
 import 'presentation/router/app_router.dart';
