@@ -331,9 +331,14 @@ Deno.test({ name: "the agent runs on ARO 1.5's coding capability on Pro, and its
   assertEquals(free.out.find((e) => e.type === 'text').text, 'Hello from aro-1.5');
 
   await db.rpc('aro_admin_grant_plan', { p_admin: 'admin', p_user: 'u1', p_plan: 'pro', p_days: 30 });
+  // Until the Code adapter is published, ARO 1.5 serves the coding capability…
   const pro = await run();
-  assertEquals(pro.models, ['aro-code']);
+  assertEquals(pro.models, ['aro-1.5']);
   assertEquals(pro.out.find((e) => e.type === 'model').aroModel, 'aro-code');
+  // …and once it is, the agent uses it.
+  await db.sql("update aro_models set served_name = 'aro-code' where id = 'aro-code'");
+  const published = await run();
+  assertEquals(published.models, ['aro-code']);
 } });
 
 Deno.test('path safety and secret detection', () => {

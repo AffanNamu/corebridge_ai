@@ -18,7 +18,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check every function
-        run: deno check ai-router/index.ts aro-agent/index.ts aro-admin/index.ts file-process/index.ts export-artifact/index.ts
+        run: deno check ai-router/index.ts aro-agent/index.ts aro-admin/index.ts aro-knowledge/index.ts file-process/index.ts export-artifact/index.ts
       # Includes the SQL migrations, run in an in-process Postgres (PGlite).
       - name: Unit tests
         run: deno test -A tests/

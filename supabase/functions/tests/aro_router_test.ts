@@ -56,9 +56,20 @@ Deno.test('auto routing picks the specialist by topic', () => {
   assertEquals(route('What is this?', true), 'aro-vision');
 });
 
+Deno.test({ name: "Pro user: until the Code adapter is published, ARO 1.5 serves the coding capability with its coding instructions", ...opts, fn: async () => {
+  const db = await testDb();
+  await db.rpc('aro_admin_grant_plan', { p_admin: 'admin', p_user: USER, p_plan: 'pro', p_days: 30 });
+  const server = aroServer();
+  const out = await frames(await routerRequest(chat('Fix this bug in my JavaScript code'), { verify, db, env: ARO_ENV, fetchImpl: server.fetchImpl }));
+  assertEquals(server.calls.map((c) => c.model), ['aro-1.5'], 'no request for an adapter the server does not have');
+  assertStringIncludes(server.calls[0].system, 'with its coding capability active');
+  assertEquals([out[0].meta.aroModel, out[0].meta.model], ['aro-code', 'aro-1.5']);
+} });
+
 Deno.test({ name: "Pro user: Auto sends a coding question to ARO 1.5's coding capability, which still says it is ARO 1.5", ...opts, fn: async () => {
   const db = await testDb();
   await db.rpc('aro_admin_grant_plan', { p_admin: 'admin', p_user: USER, p_plan: 'pro', p_days: 30 });
+  await db.sql("update aro_models set served_name = 'aro-code' where id = 'aro-code'"); // its adapter is published
   const server = aroServer();
   const out = await frames(await routerRequest(chat('Fix this bug in my JavaScript code'), { verify, db, env: ARO_ENV, fetchImpl: server.fetchImpl }));
   assertEquals(server.calls[0].model, 'aro-code');
@@ -80,6 +91,8 @@ Deno.test({ name: 'Free user: Auto never blocks — ARO 1.5 answers and the app 
 
 Deno.test({ name: 'a specialist without a published adapter answers through ARO 1.5 on the same server', ...opts, fn: async () => {
   const db = await testDb();
+  // The catalogue says the adapter is published, but the server doesn't have it (yet): fall back at runtime.
+  await db.sql("update aro_models set served_name = 'aro-translate' where id = 'aro-translate'");
   const server = aroServer(['aro-1.5']); // only ARO 1.5 trained so far
   const out = await frames(await routerRequest(chat('Translate hello into Swahili', 'aro-translate'), { verify, db, env: ARO_ENV, fetchImpl: server.fetchImpl }));
   assertEquals(server.calls.map((c) => c.model), ['aro-translate', 'aro-1.5']);
