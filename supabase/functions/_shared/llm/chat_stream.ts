@@ -200,6 +200,7 @@ async function* streamOpenAI(
   );
 
   let usage: StreamEvent | undefined;
+  let produced = false;
   for await (const payload of readSseData(response.body!)) {
     if (payload === '[DONE]') break;
     let event: any;
@@ -209,7 +210,10 @@ async function* streamOpenAI(
       continue;
     }
     if (event.error) {
-      throw new ProviderError(`${label} error: ${event.error.message ?? 'unknown'}`, 502, false);
+      // ARO's server fails a job inside the stream (e.g. an adapter that isn't loaded yet). Before any
+      // output, that is safe to retry on the next endpoint (ARO 1.5), so the user still gets an answer.
+      const retry = endpoint.provider === 'aro' && !produced;
+      throw new ProviderError(`${label} error: ${errorText(event.error)}`, retry ? 503 : 502, retry);
     }
     if (event.usage && typeof event.usage.prompt_tokens === 'number') {
       usage = {
@@ -222,10 +226,23 @@ async function* streamOpenAI(
     const delta = event.choices?.[0]?.delta;
     if (!delta) continue;
     const reasoning = delta.reasoning_content ?? delta.reasoning;
-    if (typeof reasoning === 'string' && reasoning) yield { type: 'thinking', text: reasoning };
-    if (typeof delta.content === 'string' && delta.content) yield { type: 'content', text: delta.content };
+    if (typeof reasoning === 'string' && reasoning) {
+      produced = true;
+      yield { type: 'thinking', text: reasoning };
+    }
+    if (typeof delta.content === 'string' && delta.content) {
+      produced = true;
+      yield { type: 'content', text: delta.content };
+    }
   }
   if (usage) yield usage;
+}
+
+/** RunPod sends `error` as a string; OpenAI-compatible servers send `{message}`. */
+function errorText(error: unknown): string {
+  if (typeof error === 'string') return error;
+  const message = (error as { message?: unknown })?.message;
+  return typeof message === 'string' ? message : 'unknown';
 }
 
 // ------------------------------------------------------------ Gemini native

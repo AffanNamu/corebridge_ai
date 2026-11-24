@@ -242,7 +242,13 @@ async function openAITurn(
     label,
   );
 
-  const message = data.choices?.[0]?.message ?? {};
+  if (data?.error || !Array.isArray(data?.choices)) {
+    // A failed job (e.g. an ARO adapter that isn't loaded) can come back as 200 with an error body:
+    // never treat it as an empty answer. For ARO it may be retried on ARO 1.5.
+    const reason = typeof data?.error === 'string' ? data.error : data?.error?.message ?? 'no answer';
+    throw new ProviderError(`${label} error: ${shortError(String(reason), 200)}`, endpoint.provider === 'aro' ? 503 : 502, endpoint.provider === 'aro');
+  }
+  const message = data.choices[0]?.message ?? {};
   const rawCalls: any[] = Array.isArray(message.tool_calls) ? message.tool_calls : [];
   const toolCalls = rawCalls.map((call, index) => ({
     id: String(call.id ?? `call_${index}`),
